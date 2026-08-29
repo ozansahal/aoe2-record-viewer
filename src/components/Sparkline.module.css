@@ -1,0 +1,47 @@
+/* ---- sparklines ----
+   At the foot of the page now rather than in a panel with the scrubber, so
+   there is no shared grid to keep an x-axis locked to: the transport is docked
+   at the bottom of the window and these are the last thing in the flow. Each
+   is a heading line with a plot folded under it. */
+.spark { display: block; }
+/* Stacked sparklines read as one group. */
+.spark + .spark { margin-top: var(--space-3); }
+/* Folded, a row is one line of text, and the stacked margin between two of them
+   is a gap in a paragraph rather than a break between two sections. Selector rather
+   than a modifier class: an unfolded row is exactly the condition, and the
+   markup already says it. */
+.spark:not(:has(.plot)) + .spark { margin-top: var(--space-1); }
+/* The line that survives the fold: the name and the figures at the playhead,
+   side by side. Baseline rather than centre -- the heading is small uppercase
+   and the figures are monospace digits, so their box heights differ and only
+   their baselines agree. */
+.head { display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; }
+/* A button, because it folds the plot -- but it keeps the heading's type, so
+   the two of them read as one list of headings. The caret is pulled into the
+   left margin so the words stay on the column's edge: indent them by the
+   caret's width and the headings no longer line up with anything else. */
+.title {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) var(--space-1); margin-left: -5px; border: 0; background: none;
+  border-radius: var(--radius-sm); cursor: pointer; text-align: left;
+  font-family: inherit; font-weight: inherit;
+  font-size: var(--text-small); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint);
+}
+.title:hover { color: var(--ink-dim); background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.title:hover .caret, .title:hover .caretOpen { color: inherit; }
+/* Set beside the title's own uppercase, and smaller than the map's caret -- it
+   is punctuation on a label here, not the heading of a panel. */
+.caret, .caretOpen {
+  display: inline-block; font-size: var(--text-small); line-height: 1; color: var(--ink-faint);
+  transition: transform .14s ease;
+}
+.caretOpen { transform: rotate(90deg); }
+.vals {
+  display: flex; gap: var(--space-3);
+  font: 600 var(--text-small)/1 ui-monospace, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+}
+/* Under the heading, and the full width of it: nothing lines up with this any
+   more, so the plot spends no width on an inset it no longer shares. */
+.plot { padding-top: var(--space-1); }
+.plot svg { display: block; width: 100%; overflow: visible; }
+.empty { font-size: var(--text-small); color: var(--ink-faint); font-style: italic; }

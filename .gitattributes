@@ -1,0 +1,7 @@
+# One line ending in the repository, whatever the checkout does locally.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.webp binary
+*.aoe2record binary

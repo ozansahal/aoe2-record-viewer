@@ -1,0 +1,79 @@
+/* ---- the pill ----
+   The transport, docked across the bottom of the window by Scrubber, which
+   also hands in the track that follows the buttons. It floated over the
+   bottom-right corner while the main scrubber was up in the page and scrolled
+   away; both are one bar now, so the only thing left of "floating" is the
+   shape -- a pill on the app's background, lifted off it by the shadow.
+
+   No `position: fixed`: the strip around it (`.dock` in Scrubber.module.css)
+   is a flex sibling of the scrolling pane, so the bar keeps its own space
+   instead of covering the foot of the page. */
+.hud {
+  display: flex; align-items: center; gap: var(--space-1);
+  background: var(--panel); border: 1px solid var(--line);
+  /* Asymmetric: the left end opens on a round button, which sits inside the
+     curve on its own, while the right end is now the track -- and the top and
+     bottom of the track are its caret strips, which a 999px corner would clip
+     an age mark off at the very end of a match. */
+  /* Concentric with the round button at the left end, not merely "round".
+     999px makes the end a stadium whose curve is half the pill's height --
+     which is not the button's curve, and at this size the two arcs visibly
+     disagree. The radius that matches is the button's own plus the padding
+     between them, and the padding has to be even for the two centres to be
+     the same point: 22 + 7.5. */
+  border-radius: 1.875rem; padding: var(--space-2) var(--space-6) var(--space-2) var(--space-2);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
+}
+/* Round, not a lozenge: 42.5 by 37.5 was a pill wide enough to read as a
+   stretched circle, and three of them beside a pill-shaped bar made the shape
+   the only thing that was almost right. One number for both axes settles it,
+   a little up from either. */
+.hud button {
+  display: grid; place-items: center; width: 2.75rem; height: 2.75rem;
+  border: 0; border-radius: var(--radius-pill); cursor: pointer;
+  background: var(--panel-2); color: var(--ink); font-size: var(--text-control); line-height: 1;
+  touch-action: none; user-select: none;
+  flex: none;
+}
+.hud button:hover { background: var(--accent); color: #fff; }
+/* Not a fifth round button: the four glyph buttons are a matched set and a
+   circle between them would join it rather than read as the mode switch it
+   is. A short, quiet chip instead -- text where they are glyphs, dim until
+   pointed at, and no accent fill on hover, which is reserved here for "this
+   is playing". Fixed width and tabular figures so stepping 8x -> 16x -> 32x
+   never shuffles the pill it sits in.
+
+   Written as `.hud .speed` rather than `.speed`: two classes outrank the
+   class-plus-element `.hud button` above, so this overrides it without
+   `!important` and without having to exclude the chip from that rule. */
+.hud .speed {
+  width: 2.625rem; height: 1.875rem; border-radius: var(--radius-lg);
+  color: var(--ink-dim);
+  font-size: var(--text-small); font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.hud .speed:hover { background: var(--panel-2); color: var(--ink); }
+/* Filled while playing, so the glyph it shares with the step buttons is never
+   the only thing telling them apart. */
+.play[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.rule { width: 1px; height: 1.625rem; background: var(--line); margin: 0 var(--space-1); flex: none; }
+/* The wheel target. `ns-resize` is the only cursor that says "this responds to
+   up and down" without also promising a drag, and it is the whole hint there
+   is -- nothing about a clock otherwise suggests scrolling it. Selection off
+   because a fast scroll over text drags a selection across the digits, which
+   turns the readout blue for the rest of the session. */
+.time {
+  min-width: 4.375rem; padding: 0 var(--space-1); text-align: center; flex: none;
+  font: 600 var(--text-control)/1 ui-monospace, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  cursor: ns-resize; user-select: none;
+}
+
+/* The two jump glyphs. Sized against the 16px the step arrows are set at
+   rather than filling the button: a drawn triangle with no side bearings comes
+   out heavier than a typed one at the same nominal size, and the four of them
+   sit in a row. */
+/* Sized to sit level with the step arrows beside them, which are type: `◀` at
+   16px is about 10px of ink across, so the drawing has to be wider than that
+   nominally -- a glyph carries side bearings and a triangle drawn to the edge
+   of its box does not. */
+.glyph { width: 1.25rem; height: 1.25rem; fill: currentColor; }

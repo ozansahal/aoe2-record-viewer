@@ -1,0 +1,107 @@
+/* The window's own furniture: the bar across the top, the pane that scrolls,
+   and the team grid the cards are laid into. */
+
+/* ---- the bar at the top of the window ----
+   A flex sibling of the scrolling pane rather than an overlay on it: it keeps
+   its own space without padding on everything else to match, and nothing can
+   scroll underneath it because the document does not scroll at all. */
+.chrome {
+  flex: 0 0 auto; z-index: 30;
+  /* The accent rule the open tab sits on: it runs the width of the window and
+     the tab breaks it, which is what says which tab is open. The break is the
+     tab's own doing -- see the negative margin on `.tabs` in
+     TabBar.module.css, which drops the strip onto this line so the open tab's
+     fill covers the pixel under it. A pixel, and the same one the tabs are
+     outlined in: a heavier rule than the outline it runs into reads as two
+     different lines meeting. */
+  background: var(--bg); border-bottom: 1px solid var(--accent);
+}
+/* The window's width, less the same padding everything else keeps. */
+.header {
+  display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
+  padding: var(--space-4) var(--space-6);
+}
+.title { font-size: var(--text-title); margin: 0; letter-spacing: -0.01em; }
+/* The header's gap is a size too much between a mark and its name, so the
+   mark takes half of it back. */
+.icon { width: 2rem; height: 2rem; flex: none; border-radius: var(--radius); margin-right: calc(var(--space-2) * -1); }
+
+/* The far end of the header, which is the only strip a browser keeps. Quiet
+   by default: it is an offer, not the thing the page is for, and the page
+   works without ever taking it. */
+.download {
+  margin-left: auto; flex: none;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  font-size: var(--text-small); color: var(--ink-dim); text-decoration: none;
+  white-space: nowrap;
+}
+.download:hover { background: var(--panel-2); border-color: var(--ink-faint); color: var(--ink); }
+.download:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+
+/* The scrolling pane. Full width, with the scrollbar at the edge of the
+   window rather than beside the text. `min-height: 0` because a flex child
+   will not shrink below its content without it, which would put the scrollbar
+   back on the document.
+
+   Everything in here runs the whole width. There was a centred 1144px column
+   for a while, which on a wide window spent both margins on empty background
+   while the player cards -- which were never in it -- ran past on either
+   side. The padding is all that is left of it. */
+.wrap {
+  /* Named because sticky children have to cancel it out -- see .phead in
+     PlayerCard.module.css. A custom property crosses module boundaries the
+     way a class name cannot: it inherits down the tree. */
+  --pane-pad-top: var(--space-6);
+  flex: 1; min-height: 0; overflow-y: auto;
+  /* 75px of run-off at the foot once, so the last card cleared the floating
+     HUD and the window edge. The transport is a docked bar below this pane
+     now and keeps its own space, so what is left here is the gap between the
+     last thing on the page and the bar. */
+  padding: var(--pane-pad-top) var(--space-6) var(--space-7);
+}
+/* The recordings page, which is one panel rather than a document: it takes the
+   height of the pane and scrolls its own list, instead of being a short box
+   with the window's background under it. The match keeps the plain block flow
+   above -- it is meant to run past the bottom and be scrolled. The 60px of
+   run-off goes with it, since nothing here runs off. */
+.wrap.paged { display: flex; flex-direction: column; padding-bottom: var(--space-6); }
+/* ---- the sparklines at the foot of the page ----
+   They used to share a panel, and a grid, with the scrubber at the top. The
+   scrubber is docked at the bottom of the window now, so there is nothing left
+   to line their x-axis up with -- and they belong after the cards anyway: they
+   are what the match looked like, read once the cards have said what happened.
+   The box is all this is; what goes in it brings its own spacing. */
+.sparks {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: var(--space-4) var(--space-6); margin-top: var(--space-6);
+}
+
+.warn {
+  margin-bottom: var(--space-6); padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); font-size: var(--text-control);
+  background: color-mix(in srgb, var(--build) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--build) 34%, transparent);
+  color: var(--ink-dim);
+}
+
+/* ---- the team grid ----
+   A row break should fall between teams, not through one. Each team is a flex
+   block whose preferred width is its own cards laid out side by side, so two
+   teams share a row only while both fit whole; below that the block claims the
+   full row and the wrap happens inside it instead. `--n` is the team's size,
+   set on the element. Growth is proportional to it as well, which keeps cards
+   the same width across a lopsided game like 3v1. */
+.players { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: start; }
+.team {
+  --card: 25.75rem;
+  /* The second term is the gap below, so it has to be the same token. */
+  --span: calc(var(--n) * var(--card) + (var(--n) - 1) * var(--space-6));
+  display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: start;
+  flex: var(--n) 1 var(--span);
+  /* Capped at the row: an eight-player team would otherwise demand more width
+     than there is and overflow the pane rather than wrapping inside itself. */
+  min-width: min(100%, var(--span));
+}
+/* Its children are player cards and nothing else, so this does not have to
+   name a class another module owns. */
+.team > * { flex: 1 1 var(--card); min-width: min(100%, var(--card)); }

@@ -1,0 +1,26 @@
+/* ---- what the cards are counting ----
+   Its own row between the map panel and the cards, rather than the last thing
+   in the controls panel. It is the cards' heading: 15px under it and the row
+   belongs to what follows, which is the whole point of having moved it.
+
+   No panel of its own. Two boxes with one segmented control between them read
+   as a third section of the page, and this is a caption on the section below
+   -- the ground it sits on is the page, the way the team grid's is. */
+.row {
+  display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap;
+  margin: 0 0 var(--space-4);
+}
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+.seg button {
+  border: 0; background: var(--panel-2); color: var(--ink-dim); cursor: pointer;
+  padding: var(--space-2) var(--space-4); font: inherit; font-size: var(--text-control);
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.seg button + button { border-left: 1px solid var(--line); }
+
+.ctl { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-control); color: var(--ink-dim); }
+.ctl input[type=number] {
+  width: 5.25rem; padding: var(--space-2) var(--space-2); font: inherit; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+}

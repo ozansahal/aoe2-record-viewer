@@ -1,0 +1,9 @@
+/* ---- match meta ---- */
+.meta { display: flex; gap: var(--space-7); flex-wrap: wrap; margin-bottom: var(--space-6); }
+/* Each field is a row of its own so the difficulty pill does not sit on a
+   baseline and push the bar taller than its text -- the gap replaces the space
+   that used to separate the label from the value. */
+.meta div { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-control); }
+/* The label only. The value is a span too now -- it has to be, to carry the
+   difficulty colour -- so this can no longer be every span in the bar. */
+.meta div > span:first-child { color: var(--ink-faint); }

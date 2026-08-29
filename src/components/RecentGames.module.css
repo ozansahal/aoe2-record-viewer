@@ -1,0 +1,67 @@
+/* ---- the last few games ----
+   A panel on the summary, built to the same chrome as the periods list under
+   it: a titled bar in the second grey, then rows. What it is *not* is the
+   recordings page in miniature -- no filter, no folder, no file name, no menu
+   -- because it is the end of a list you are already at rather than a list you
+   are searching. */
+.recent {
+  border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  min-width: 0; background: var(--panel); margin: 0 0 var(--space-5);
+}
+/* The same head the periods panel has, so the two read as one page: small
+   capitals in the second grey, with the way out of it at the far end. */
+.head {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line); background: var(--panel-2);
+  font-size: var(--text-small); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+/* The button is the head's own height, not a line of body text in it. */
+.head > button { flex: none; padding: var(--space-1) var(--space-3); min-height: 0; font-size: var(--text-small); }
+/* How many there are altogether, on the button that goes to them: "Show all"
+   alone does not say whether the rest is two recordings or two thousand. */
+.count {
+  font-variant-numeric: tabular-nums; color: var(--ink-faint);
+  font-size: var(--text-caption);
+}
+
+/* Whatever the panel has left under the head, and scrolling inside itself
+   rather than lengthening the page.
+
+   `flex: 1 1 0` is what makes the two columns of the band the same height. A
+   basis of zero means this box asks for no height of its own, so the panel
+   around it is only as tall as its head -- which leaves the cards column the
+   taller of the two, and the band's own `stretch` then gives that height back
+   to the panel and this fills it. Sized off its own rows instead, the list
+   would be the taller one and the cards would be the column with the slack.
+
+   `min-height: 0` because a flex item will not shrink below its content
+   without it: the rows would push the box past the height it was given and the
+   scroll would never engage.
+
+   `overscroll-behavior: contain` stops the page taking over once the list is
+   at its end -- reaching the last row and having the whole summary lurch is
+   the thing that makes an inner scroll worse than no scroll at all. */
+.list {
+  list-style: none; margin: 0; padding: 0;
+  flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+}
+.item { display: flex; border-bottom: 1px solid var(--line); }
+.item:last-child { border-bottom: 0; }
+.item:hover { background: var(--panel-2); }
+/* One line rather than the recordings page's two: everything on the second
+   line there is about the file, and none of it is on this page. */
+.row {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3);
+  border: 0; background: none; color: inherit; font: inherit; text-align: left;
+  padding: var(--space-2) var(--space-4); cursor: pointer;
+}
+.row:disabled { opacity: .5; cursor: default; }
+.row.active { box-shadow: inset 4px 0 0 var(--accent); }
+/* At the far end of the row, and the only thing on it that is not the game:
+   how long ago it was. `margin-left: auto` rather than a spacer, so it stays
+   pinned right however much room the roster takes. */
+.when {
+  flex: none; margin-left: auto; padding-left: var(--space-3);
+  font-size: var(--text-small); color: var(--ink-faint); white-space: nowrap;
+}

@@ -1,0 +1,45 @@
+/* One of the three columns inside a player card: built, researched, trained.
+   The grid that lays them out belongs to the card -- see .cats there. */
+.cat { padding: var(--space-4) var(--space-4); min-width: 0; }
+.cat + .cat { border-left: 1px solid var(--line); }
+.cat h3 {
+  margin: 0 0 var(--space-1); font-size: var(--text-small); letter-spacing: .07em;
+  text-transform: uppercase; color: var(--cc);
+}
+.cat ul { list-style: none; margin: 0; padding: 0; }
+.cat li {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  font-size: var(--text-control); padding: var(--space-1) 0; color: var(--ink-dim);
+}
+.cat li b { flex: none; color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.total { font: 600 var(--text-figure)/1.2 ui-monospace, Menlo, Consolas, monospace; }
+.distinct { font-size: var(--text-small); color: var(--ink-faint); margin-bottom: var(--space-2); }
+/* The time, which is also the button that seeks to it. `composes` brings the
+   chrome-stripping and the focus ring; the `font` shorthand below is what puts
+   this back in the monospace the column is aligned in, since the reset asks
+   for `inherit`. */
+.tm {
+  composes: seek from "../styles/ui.module.css";
+  flex: none; font: var(--text-small)/1 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+/* The only thing that says it is clickable. A row is already a dense line of
+   small type and an underline on every one of them would draw a second column
+   of rules down the card. */
+.tm:hover { color: var(--ink); }
+.nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Marks a unit row the recording named something else -- the line was renamed
+   by an upgrade. The tooltip on the row says which one. */
+.up { flex: none; font-size: var(--text-caption); line-height: 1; color: var(--ink-faint); }
+/* Re-seeds and rebuilds, beside the count of the buildings rather than added
+   to it. Muted and small: it qualifies the number it follows, and a farm belt
+   re-sown twenty-nine times must not out-shout the twenty-nine farms. */
+.again {
+  flex: none; font-size: var(--text-small); color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* One dot per opposing player who also has the tech by now. */
+.shared { flex: none; display: inline-flex; gap: var(--space-1); align-items: center; }
+.shared i { display: block; width: 0.5rem; height: 0.5rem; border-radius: 50%; }
+.none { font-size: var(--text-control); color: var(--ink-faint); font-style: italic; }

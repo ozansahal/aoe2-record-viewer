@@ -1,0 +1,220 @@
+/* ---- the files page ----
+   Everything there is to open: the folder the game writes to and the parses
+   kept in this browser, in one list. */
+/* The whole page, and the only thing in the pane when it is up -- so the gap
+   below it is the pane's own padding, not a margin of its own on top of it. */
+.library {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+  /* A column so the list can take whatever height the head and the footers
+     leave. `min-height: 0` is what lets the pane shrink it to the window --
+     a flex item will not go below its content without it, and the panel would
+     grow past the bottom instead of the list scrolling. */
+  display: flex; flex-direction: column; min-height: 0;
+}
+.head {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap;
+  padding: var(--space-4) var(--space-4); border-bottom: 1px solid var(--line); background: var(--panel-2);
+}
+/* One row, always. The row used to wrap, which dropped "Load recordings" onto
+   a line of its own and pushed the list down -- and it wrapped even though the
+   path was set to shrink, because a flex box breaks lines on the items'
+   unshrunk widths and only then shrinks what is on each line. So: nothing
+   wraps, and the buttons hold their size. What gives instead is the path --
+   the one thing here that can be arbitrarily long -- and after it, the filter
+   box. */
+.head > strong, .head > button { flex: none; }
+/* The shrink factor is weighted by the item's own width, so a plain `1` here
+   would take the filter box down with the path from the first pixel. A large
+   one makes the path take practically all of it until there is none of it
+   left, which is the order it should go in. */
+.path {
+  min-width: 0; flex-shrink: 100; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--text-small); color: var(--ink-faint);
+}
+.chip {
+  flex: none; font-size: var(--text-small); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-faint); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: var(--space-hair) var(--space-2);
+}
+/* The rescan glyph. `currentColor` throughout, so it takes .ghost's hover with
+   the border rather than needing its own rule for it. */
+.reload { display: block; width: 1.125rem; height: 1.125rem; color: currentColor; }
+/* The head's other glyphs, in the same box as the rescan arrow so a row of
+   buttons has one icon size in it. `flex: none` because .ghost is a flex box
+   now: an SVG in one is an item, and would be squashed by a long label
+   otherwise. */
+.glyph { display: block; width: 1.125rem; height: 1.125rem; flex: none; color: currentColor; }
+/* One second a turn, which reads as working rather than as an animation. The
+   origin has to be said, because an SVG rotates about its top-left otherwise. */
+.turning { animation: turn 1s linear infinite; transform-origin: 50% 50%; }
+@keyframes turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .turning { animation: none; } }
+
+/* What the background scan is up to, directly under the head it belongs to.
+   Styled as a footer rather than as a message: it is not something that went
+   wrong, and it is there for minutes. */
+.scan {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line); background: var(--panel-2);
+  font-size: var(--text-small); color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+
+/* Second in line to give, after the path: on a window narrow enough that the
+   path has already gone to nothing, the filter box shrinks rather than the
+   buttons wrapping. */
+.search {
+  flex: 0 1 13.25rem; min-width: 6rem; padding: var(--space-2) var(--space-3); font: inherit; font-size: var(--text-control);
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--panel); color: var(--ink);
+}
+
+/* Whatever is left of the panel, and the only thing here that scrolls. It was
+   capped at 46vh, which on a tall window stopped the list halfway down and put
+   a band of empty background under the panel; the footers below it stay put
+   either way, since they are siblings rather than part of the scroll. */
+.list { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto; }
+/* When a row was written, as a heading over the run of rows that share it.
+   Sticky against the list's own scroll, so the day you are looking at stays
+   named while you go down it -- and opaque, because the rows scroll under it.
+   The border sits on the bottom only: the row above it already draws one. */
+.group {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: baseline; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-2); background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-small); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+/* How many rows are under it. Dimmer than the date and without the tracking:
+   it is a figure rather than a word, and at this size letter-spacing on digits
+   reads as a gap in the number. */
+.groupCount {
+  letter-spacing: 0; font-variant-numeric: tabular-nums; opacity: .65;
+}
+.item { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
+.item:last-child { border-bottom: 0; }
+/* On the row, not on the button inside it: the button stops short of the menu
+   button beside it, so highlighting it left an unlit band down the right of
+   every hovered row -- with the control that appears on hover sitting in it. */
+.item:hover { background: var(--panel-2); }
+.row {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3);
+  border: 0; background: none; color: inherit; font: inherit; text-align: left;
+  padding: var(--space-3) var(--space-4); cursor: pointer;
+}
+/* The two lines, beside the badge rather than under it. The badge is about the
+   whole row, so it sits in a gutter of its own and is centred against both --
+   and both lines start at the same x without either being padded to it. */
+.lines {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1);
+  align-items: flex-start;
+}
+.row:disabled { opacity: .5; cursor: default; }
+.row.active { box-shadow: inset 4px 0 0 var(--accent); }
+
+/* An unparsed file has nothing to say about the game yet, so its name is the
+   whole of the line the map, difficulty, duration and roster would be on. Sized
+   like that line, since it stands in for it. */
+.unparsed {
+  max-width: 100%; font-size: var(--text-control); color: var(--ink); font-weight: 550;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The second line: everything about the file rather than the game. Small and
+   faint on purpose -- it is what you check after you have found the row, not
+   what you find it by. */
+/* The row's second line, and it is a line: one, always.
+   Wrapping, it put the folder badge, the age and the size onto a third row of
+   their own the moment the window was narrower than the four of them laid out
+   -- so a list read down had rows two lines tall and rows three lines tall
+   depending on the width, which is the raggedness every rule in this file and
+   in GameLine's is written to avoid. `align-self: stretch` because the column
+   above aligns to the start, so without it this sizes to its own content and
+   then has nothing to give. */
+.meta {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap;
+  align-self: stretch; min-width: 0;
+  font-size: var(--text-small); color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+/* Nothing on the line gives except the file name below. The badge is capped
+   and ellipsised already, and the age and the size are three or four
+   characters that mean nothing shortened. */
+.meta > * { flex: none; }
+/* Long, and the same twenty characters of prefix on every one of them, so it
+   gets a share of the line rather than all of it. */
+.name {
+  flex: 0 1 auto; min-width: 0; max-width: 21.875rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Where a row came from, and one badge only: the folder path for a file still
+   on disk, otherwise what the kept parse alone can say -- "loaded" for one
+   that came in through the button, "saved" for one whose file is gone or that
+   was imported before the two were told apart. */
+.src {
+  flex: 0 0 auto;
+  padding: 0 var(--space-2); border-radius: var(--radius-sm);
+  background: var(--panel-2); color: var(--ink-dim);
+  font-size: var(--text-small); letter-spacing: .02em;
+  max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Both mean "opens without parsing", so both take a colour rather than the
+   folder's grey. Apart from each other because they say different things:
+   green for the parse that is all there is left of a recording, gold for one
+   that was never in the folder to begin with. */
+.src.saved { color: var(--unit); }
+.src.loaded { color: var(--gold); }
+
+/* The row's own actions, behind one button in the same place on every row.
+   Present for the pointer and the keyboard, invisible until one of them is on
+   the row -- and while its menu is up, since the row underneath is no longer
+   the thing being hovered. */
+.more {
+  flex: none; align-self: center; margin-right: var(--space-3); opacity: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: var(--radius-lg); background: none;
+  color: var(--ink-faint); padding: var(--space-2) var(--space-2); cursor: pointer;
+}
+.item:hover .more, .more:focus-visible, .more[aria-expanded="true"] { opacity: 1; }
+.more:hover, .more[aria-expanded="true"] {
+  color: var(--ink); background: var(--panel); border-color: var(--line);
+}
+/* Nothing to hover with, so nothing to reveal on hover. */
+@media (hover: none) { .more { opacity: 1; } }
+.dots { display: block; width: 1.125rem; height: 1.125rem; fill: currentColor; }
+
+/* Fixed, and placed from the button's rect -- see RowMenu. `top` and `right`
+   are written by that; everything the menu looks like is here. */
+.menu {
+  position: fixed; z-index: 30; min-width: 13.5rem;
+  display: flex; flex-direction: column; padding: var(--space-1);
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  box-shadow: 0 12px 35px rgb(0 0 0 / .28);
+}
+.menuItem {
+  border: 0; border-radius: var(--radius); background: none; color: var(--ink-dim);
+  font: inherit; font-size: var(--text-control); text-align: left;
+  padding: var(--space-2) var(--space-3); cursor: pointer;
+}
+.menuItem:hover, .menuItem:focus-visible { background: var(--panel-2); color: var(--ink); }
+.menuItem:disabled { opacity: .45; cursor: default; background: none; color: var(--ink-dim); }
+/* The ones that throw something away. Red before it is pressed, rather than a
+   confirmation afterwards being the first sign of what it was. */
+.danger { color: var(--red); }
+.danger:hover:not(:disabled), .danger:focus-visible:not(:disabled) { color: var(--red); }
+
+.empty { padding: var(--space-6) var(--space-4); font-size: var(--text-control); color: var(--ink-dim); }
+.empty.err { color: var(--red); }
+.empty code {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--space-hair) var(--space-2); font-size: var(--text-small);
+}
+.foot {
+  padding: var(--space-2) var(--space-4); border-top: 1px solid var(--line);
+  font-size: var(--text-small); color: var(--ink-faint); background: var(--panel-2);
+}
+/* A sentence with a button in it, so it has to sit on the text baseline. */
+.link {
+  border: 0; background: none; padding: 0; font: inherit; cursor: pointer;
+  color: var(--accent); text-decoration: underline;
+}

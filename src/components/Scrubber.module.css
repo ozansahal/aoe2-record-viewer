@@ -1,0 +1,91 @@
+/* ---- the docked transport ----
+   The strip the bar sits in. A flex sibling of the scrolling pane rather than
+   an overlay on it -- the same arrangement the chrome at the top uses, and for
+   the same reason: it keeps its own space, so nothing above has to leave a gap
+   for it and no measured height has to be kept in step across two stylesheets.
+   The pill itself is FloatingScrubber's `.hud`; there is nothing to draw here.
+
+   The horizontal padding matches the scrolling pane's, so the bar's ends line
+   up with the cards above it. */
+.dock { flex: 0 0 auto; padding: 0 var(--space-6) var(--space-4); }
+
+/* Slider and its two caret strips share one column, so a caret's offset and
+   the thumb's resolve against the same width. Keep them siblings inside
+   .track -- never siblings of the buttons. */
+.track {
+  flex: 1;
+  /* Shrinks rather than wrapping the pill onto a second row: a docked bar
+     whose height changed with the window's width is a docked bar that moves. */
+  min-width: 7.75rem;
+}
+/* The one control in here the stylesheet cannot resize: the track and the
+   thumb are drawn by the platform at a fixed size whatever is declared, and
+   taking them over means `appearance: none` and drawing both by hand, which
+   also loses `accent-color`. So it is zoomed instead.
+
+   The factor is not the old blanket 1.25 that used to be multiplied through
+   the whole stylesheet, even though it is the same number: the platform draws
+   this control at 16px whatever the page asks for, and the transport around it
+   is drawn a quarter larger than that. This is the one place left that has to
+   state a ratio, because it is the one control CSS cannot reach.
+
+   Nothing else has to change for it: a percentage resolves in the element's
+   own zoomed coordinates, so `100%` still means the column. What does change
+   is the thumb -- see `--range-thumb` on .ticks below. */
+.track input[type=range] {
+  display: block; width: 100%; zoom: 1.25; margin: 0; accent-color: var(--accent);
+}
+
+/* ---- age marks, one player above the slider and one below ----
+   Carets, not numerals: which age a mark is is on its tooltip, and at this
+   size a numeral was three monospace glyphs pretending to be one token. What
+   the mark still has to say without being read is *whose* it is, which is the
+   colour, and *when*, which is the position. */
+/* Exactly as tall as the mark in it -- the strip is a drawn shape's box, not a
+   line of type with a glyph somewhere inside it. */
+.ticks {
+  /* The native thumb is 16px, and the zoom above takes it to 20 measured from
+     out here. A device measurement of a control this stylesheet does not draw,
+     so it is px and it is not one of the spacing steps: the marks below line
+     up with the thumb, not with the layout. */
+  --range-thumb: 20px;
+  position: relative; height: 0.625rem;
+}
+/* `.ticks .tick`, two classes, because this sits inside `.hud` and
+   `.hud button` is a class *and* an element -- which outranks a lone class, so
+   every mark was being given the 44px plated circle the transport's own
+   buttons wear. They are not those buttons: a mark is a shape on the track. */
+/* `composes` has to sit on a lone class -- a descendant selector is not a
+   thing CSS modules will compose from. Everything that has to outrank
+   `.hud button` is in the two-class rule below. */
+.tick { composes: seek from "../styles/ui.module.css"; }
+.ticks .tick {
+  position: absolute; transform: translateX(-50%);
+  /* The triangle *is* the button, so the hit target is the shape and there is
+     no box around it to see. Bigger than the character it replaced in both
+     directions, and it costs the bar nothing, because a drawn shape has no
+     bearings or leading to carry. */
+  width: 1rem; height: 0.625rem; background: currentColor;
+  border-radius: 0;
+  /* The thumb centre travels from THUMB/2 to width-THUMB/2, so a raw
+     percentage drifts at both ends. Inset by the thumb radius to match. */
+  left: calc(var(--f) * (100% - var(--range-thumb)) + var(--range-thumb) / 2);
+  transition: opacity .12s ease, transform .12s ease;
+}
+/* Pointing in at the track from whichever side the player sits on. */
+.above .tick { clip-path: polygon(50% 100%, 0 0, 100% 0); }
+.below .tick { clip-path: polygon(50% 0, 0 100%, 100% 100%); }
+/* An age nobody has reached yet at the playhead, kept on the track rather than
+   hidden: where the next one falls is half of what the strip is for. */
+.ticks .tick.future { opacity: .32; }
+/* The mark grows rather than changing colour: the colour is whose it is, and
+   it is set from the code as an inline style, which no rule in here can beat.
+   The translate has to be restated -- a second `transform` replaces the first
+   rather than adding to it, and dropping it would slide every caret half its
+   width off the moment it was pointed at. */
+.ticks .tick:hover, .ticks .tick:focus-visible {
+  transform: translateX(-50%) scale(1.3); opacity: 1;
+}
+/* Each caret points inward, at the track it marks. */
+.above .tick { bottom: 0; }
+.below .tick { top: 0; }

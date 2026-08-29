@@ -1,0 +1,478 @@
+/* ---- the map ----
+   Its own panel under the controls, and unlike them it does *not* take the
+   8.5rem label column the scrubber and the sparklines share. A sparkline is a
+   strip of numbers that wants a word beside it; the map is the picture, and
+   giving it the full panel is worth more than lining its heading up with
+   theirs. Everything the label column used to hold sits over the plot now.
+
+   Only the heading stays outside -- it is the control that unfolds the panel,
+   so it has to survive the plot being gone. */
+.minimap {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: var(--space-4) var(--space-5) var(--space-5);
+
+  /* How wide the plot is allowed to get. The backing store is 2048 wide, so
+     at the cap there are still 1.6 canvas pixels to a CSS pixel and the map is
+     sampled down rather than magnified -- past this it starts being stretched,
+     and it is no more readable for being the width of a desk. */
+  --map-max: 1280px;
+
+  /* The cap is on the panel, not on the plot inside it. Capping the plot alone
+     left the border running the full width of the window with the map sitting
+     in one corner of it -- a box visibly larger than its contents. This way the
+     panel is the map's size and the leftover space is margin, split evenly, so
+     everything inside can go on filling the panel edge to edge. The added term
+     is the panel's own padding either side plus its two borders, written out
+     rather than added up so it cannot drift from them. */
+  max-width: calc(var(--map-max) + var(--space-5) * 2 + 2px);
+  margin: 0 auto var(--space-6);
+}
+/* Half the cap, and nothing else changes: the canvas is a fixed backing store
+   scaled by CSS, so the whole of "compact" is this one number. At 640px the
+   diamond is 320px tall -- a map you can still find a base on, with the player
+   cards left above the fold rather than pushed off it. The chips floating over
+   the plot are the one thing that does not scale with it, so they step down
+   too: at full size they would take a third of a compact map's width. */
+.compact { --map-max: 640px; }
+/* No cap at all: the panel takes the page, and the plot with it.
+   Deliberately a third setting rather than a larger `--map-max`, because it
+   spends two things the cap was protecting. Past 1280px the 2048-wide backing
+   store is being magnified rather than sampled down, so the map gets bigger
+   without getting sharper; and the plot is 2:1, so a window-wide one is half
+   the window tall and puts the player cards below the fold. Both are fine when
+   the map is the thing you are reading, which is what asking for this says.
+
+   `margin: 0 auto` in `.minimap` still applies and does nothing here, which is
+   correct -- there is no leftover width left to split. */
+.wide { max-width: none; }
+
+/* The heading and the size switch share the row: the switch sizes the panel,
+   so it belongs on the panel's own row rather than in the stack over the map.
+   `title` still takes everything the switch does not, so the row is a hit
+   target for the fold from the word "Map" to the switch's left edge. */
+.label { margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-3); }
+/* Collapsed, the label is the panel's only child and its margin is a gap under
+   the heading with nothing beneath it -- the folded panel came out taller than
+   the text in it. Selector rather than a modifier class: "last child" is
+   exactly the condition, and the markup already says it. */
+.label:last-child { margin-bottom: 0; }
+/* Same as a sparkline's, so the two columns read as one list of headings. */
+/* A button, because it folds the panel -- but it keeps the heading's type so
+   the column still reads as the same list of headings the sparklines start.
+
+   It takes the whole row the size switch does not: the word "Map" is four
+   characters and the caret beside it is one, so a header that only responded
+   where the ink is asked to be aimed at. The padding is what gives the row
+   height -- the panel's own top padding was carrying it before, and a hit
+   target wants its own. */
+.title {
+  display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0;
+  padding: var(--space-1) var(--space-1); margin-left: -5px; border: 0; background: none;
+  border-radius: var(--radius-sm); cursor: pointer; text-align: left;
+  font-family: inherit; font-size: var(--text-body); font-weight: 600; line-height: 1.2;
+  letter-spacing: .02em; color: var(--ink);
+  margin-bottom: var(--space-hair);
+}
+/* The plate is faint: the row is the full width of the panel, and a strong one
+   across all of it would read as a second heading bar rather than as a hover. */
+.title:hover {
+  color: var(--accent, var(--ink));
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+.title:hover .caret, .title:hover .caretOpen { color: inherit; }
+/* Solid and full size rather than a faint hairline: it is the control that
+   folds the panel, and it was reading as punctuation. */
+.caret, .caretOpen {
+  display: inline-block; font-size: var(--text-body); line-height: 1; color: var(--ink-dim);
+  transition: transform .14s ease;
+}
+.caretOpen { transform: rotate(90deg); }
+.sub {
+  font: 600 var(--text-small)/1 ui-monospace, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums; color: var(--ink-dim);
+}
+/* The same 10px thumb inset the ticks and the sparkline plots use. */
+.plot { padding: 0; }
+
+/* The canvas is a fixed 1024x512 backing store scaled by CSS, which is what
+   keeps it off any measurement -- nothing here waits on a resize to know how
+   big it is. The cap is on `.stage` above rather than here, so the tools that
+   float over the plot are bounded by the same box the plot is: the window can
+   be very wide, and a minimap the width of a desk is not more readable, it is
+   just further from the numbers beside it -- and being 2:1, a full-width one
+   is tall enough to push the player cards off the fold.
+
+   Nothing here is capped or centred: the panel above is, so the plot simply
+   fills it and the headings, the plot and the legend all keep the same left
+   edge they had before the cap existed.
+
+   No backdrop. The corners the diamond does not cover are transparent and show
+   the panel, so the map is a shape on the page rather than a picture in a
+   frame -- the plate around it was drawing a box that carries no information. */
+.canvas {
+  display: block; width: 100%; height: auto;
+  touch-action: none;  /* the canvas handles its own drag and wheel */
+}
+
+/* ---- legend ----
+   What the coloured pixels on the map are -- in two groups, not one list. The
+   seven terrain keys are vocabulary; the rest are people. Concatenated into a
+   single wrapping row they were indistinguishable, and a player called
+   "Forest" sat among the trees reading as one of them.
+
+   Two rows rather than two columns side by side, because names are of any
+   length and the players' group is the one that has to survive a narrow
+   window whole: on its own row it wraps within itself and never has to share
+   a line with a berry bush. Capped with the plot, so the rule between the
+   groups measures the map rather than the desk. */
+/* ---- the key, floated down the left of the plot ----
+   The mirror of `.tools`, and deliberately built out of the same parts: same
+   corner offsets, same plate on each item, same `pointer-events` trick so the
+   gaps between them belong to the map underneath and only the boxes take their
+   own clicks back. The tools hold the right, so this holds the left.
+
+   `max-height` with a scroll, because this one is not a fixed set: eight
+   players and nine terrains is seventeen rows, which is taller than a compact
+   map. It gives at the bottom rather than growing over the plot it is
+   labelling. */
+.floats {
+  position: absolute; top: var(--space-3); left: var(--space-4); bottom: var(--space-3);
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
+  max-width: 32%;
+  pointer-events: none;
+}
+.floats > * { pointer-events: auto; }
+/* A column, not a wrapping row: down the side of a map there is height to
+   spend and almost no width, which is the opposite of what this was under the
+   plot. */
+.legend {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  margin: 0; padding: var(--space-2) var(--space-2); list-style: none;
+  font-size: var(--text-small); color: var(--ink-faint);
+  /* The same ground the chips over the map stand on -- over terrain that is
+     dark green in one place and bright gold in another, a label needs one. */
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  backdrop-filter: blur(4px);
+  border-radius: var(--radius-lg);
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+}
+/* The terrain half, which folds. The box is what stays when it is folded --
+   the button alone, on the same plate, so the key is still a thing on the map
+   rather than something that vanished. */
+.legendBox {
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1);
+  min-height: 0;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  backdrop-filter: blur(4px);
+  border-radius: var(--radius-lg); padding: var(--space-1);
+}
+/* Its own plate is the box's, so the list inside drops both the ground and
+   the blur -- stacked, the two came out a shade darker than every other chip
+   on the map. */
+.legendBox .legend {
+  background: none; backdrop-filter: none;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1);
+}
+.legendTitle {
+  display: flex; align-items: center; gap: var(--space-1);
+  appearance: none; background: none; border: 0; cursor: pointer;
+  padding: var(--space-1) var(--space-1); color: var(--ink-dim);
+  font: inherit; font-size: var(--text-small); letter-spacing: .05em; text-transform: uppercase;
+}
+.legendTitle:hover { color: var(--ink); }
+/* Names carry a little more ink than the vocabulary above them -- they are
+   the half of the legend you look something up in. */
+.legendPlayers { color: var(--ink-dim); }
+.legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.swatch {
+  width: 0.75rem; height: 0.75rem; border-radius: var(--radius-xs); flex: none;
+  /* Hairline in the panel's own ink: the dark greens and the near-white of a
+     sheep both need an edge, on opposite themes. */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+/* ---- zoom affordances ----
+   Last in the stack over the plot, after the controls that change what is
+   drawn: where you are in the map is something you already know, so it is the
+   chip that can afford to be furthest from where the eye lands. `reset`
+   replaces `hint` rather than joining it: once you have zoomed, the way back
+   is the thing worth saying, and the current factor tells you where you are. */
+.hint { font-size: var(--text-small); color: var(--ink-faint); opacity: .65; }
+.reset {
+  align-self: start; margin-top: var(--space-hair);
+  font: inherit; font-size: var(--text-small); color: var(--ink-dim);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2); cursor: pointer;
+}
+.reset:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 12%, transparent); }
+
+/* Grab only once there is somewhere to pan to; at zoom 1 the whole map is
+   already on screen and a grab cursor would be a promise of nothing. */
+.grab { cursor: grab; }
+.grab:active { cursor: grabbing; }
+
+/* ---- military toggle ----
+   First of the chips over the plot: it is the switch the three below it are
+   all about. Off by default it would need discovering; on by default it needs
+   a way out, which is what this is. */
+.toggle {
+  align-self: start; margin-top: var(--space-1);
+  font: inherit; font-size: var(--text-small); color: var(--ink-faint);
+  background: transparent; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2); cursor: pointer;
+}
+.toggle:hover { color: var(--ink-dim); }
+.toggle.on {
+  color: var(--ink); border-color: color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+/* ---- what the map is counting ----
+   The cumulative/window pair, moved out of the controls panel: it governs the
+   action overlay and nothing else, so it belongs beside the map. "All" rather
+   than "Cumulative" because the column is only so wide and the word is not. */
+.modes { display: inline-flex; margin-top: var(--space-2); align-self: start; }
+.modes button {
+  font: inherit; font-size: var(--text-small); color: var(--ink-faint);
+  background: transparent; border: 1px solid var(--line);
+  padding: var(--space-1) var(--space-2); cursor: pointer;
+}
+.modes button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.modes button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+/* Every seam, not just the last one: with three buttons in the group the
+   middle one has a neighbour on each side, and hanging the overlap off
+   `:last-child` alone left a two-pixel double border at the first seam and
+   none at the second. */
+.modes button + button { margin-left: -1px; }
+.modes button[aria-pressed="true"] {
+  color: var(--ink); border-color: color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+/* ---- compact / large ----
+   Built like `modes` -- the same segmented pair, because it is the same kind of
+   control -- but it lives in the heading row rather than over the plot, so it
+   takes the heading's ground and none of the tools' plate. */
+/* The diamond/square switch, beside the size pair and built like one of its
+   buttons: same row, same kind of choice -- how the panel shows the map, not
+   what the map says. On its own rather than in the group, because it is one
+   state being toggled and not a pair to choose between, so it keeps all four
+   corners rounded. */
+.shape {
+  flex: none; font: inherit; font-size: var(--text-small); color: var(--ink-faint);
+  background: transparent; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-3); line-height: 1.2; cursor: pointer;
+}
+.shape:hover { color: var(--ink-dim); }
+.shape[aria-pressed="true"] {
+  color: var(--ink); border-color: color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.sizes { display: inline-flex; flex: none; }
+.sizes button {
+  font: inherit; font-size: var(--text-small); color: var(--ink-faint);
+  background: transparent; border: 1px solid var(--line);
+  padding: var(--space-1) var(--space-3); line-height: 1.2; cursor: pointer;
+}
+.sizes button:hover { color: var(--ink-dim); }
+.sizes button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.sizes button:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+/* Every seam, not just the last one -- the same rule `modes` above already
+   carries, and for the same reason. Hung off `:last-child` this worked while
+   the group was a pair and broke the moment `Wide` made it three: the overlap
+   landed only at the Large/Wide seam, so Compact and Large met in a doubled
+   two-pixel border while Large's own right edge was covered by Wide's left
+   one. On a pressed Large, which draws a brighter border than its neighbours,
+   that reads as a button with its right side missing. */
+.sizes button + button { margin-left: -1px; }
+/* The selected button paints above its neighbours. The seams in both segmented
+   groups overlap by exactly one border, so whichever button comes later covers
+   the one before it -- and since a pressed button draws the brighter border of
+   the two, the selected one is the one that visibly loses a side. Only the
+   grouped controls need it; `shape` stands alone and overlaps nothing. */
+.modes button[aria-pressed="true"], .sizes button[aria-pressed="true"] {
+  position: relative; z-index: 1;
+}
+.sizes button[aria-pressed="true"] {
+  color: var(--ink); border-color: color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+/* A word, a number you type, and a unit -- "last N sec", "decay N", "military
+   N×". One class for all three, because they are one kind of control and the
+   only thing that would come of giving each its own is three chips that nearly
+   match. Built like `reset` and `toggle` beside them: it used to declare no
+   padding and no radius of its own while still taking the tools' ground, so it
+   read as a square-cornered band with its text against the edges and a second
+   plate -- the input -- inside. */
+.secs {
+  margin-top: var(--space-1); align-self: start;
+  display: inline-flex; align-items: baseline; gap: var(--space-1);
+  font: inherit; font-size: var(--text-small); color: var(--ink-faint);
+  background: transparent; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2); line-height: 1.125rem;
+}
+/* Part of the chip, not a box on it: the field keeps only the underline it
+   needs to say it is typed into. */
+.secs input {
+  width: 2rem; font: inherit; font-size: var(--text-small); color: var(--ink);
+  text-align: center; background: none; padding: 0; margin: 0;
+  /* The underline hangs below the baseline the rest of the chip sits on;
+     without this it makes `secs` a pixel taller than every chip above it. */
+  margin-bottom: -1px;
+  border: 0; border-bottom: 1px solid color-mix(in srgb, var(--ink) 26%, transparent);
+  -moz-appearance: textfield; appearance: textfield;
+}
+.secs input:focus { outline: none; border-bottom-color: var(--ink); }
+
+/* ---- a chip the current mode has no use for ----
+   Dimmed in place rather than taken out of the row. The tools cluster wraps,
+   so a chip that disappears is not a gap: everything after it slides up, the
+   rows re-pack, and the mode buttons -- which sit *above* the numbers -- move
+   too. Pressing "All" then moved the button out from under the pointer that
+   had just pressed it. Keeping the box and dimming it is what makes the
+   cluster the same shape in all three modes.
+
+   The plate stays at full strength and only the contents fade: the chip is
+   still one of the boxes the row's edges are made of, and a plate that faded
+   with its text would leave the row looking ragged over a bright map. Enough
+   contrast left to read the label and the number -- the point is that the
+   control is *there* and inactive, which is a thing you have to be able to
+   see to understand.
+
+   Faded with `color`, not `opacity`: the two would compound on the field
+   inside -- a chip at .42 holding an input at .42 comes out at .18, which is
+   not dimmed, it is gone. `-webkit-text-fill-color` beside it because a
+   disabled input takes its grey from that rather than from `color`. */
+.muted { cursor: default; color: color-mix(in srgb, var(--ink-faint) 55%, transparent); }
+.muted input {
+  cursor: default;
+  color: inherit; -webkit-text-fill-color: currentcolor;
+  border-bottom-color: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+/* The spinners cannot fit in the width above and are not how anyone sets this. */
+.secs input::-webkit-outer-spin-button,
+.secs input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ---- controls, over the map ----
+   The diamond leaves the plot's corners empty, so the tools sit in one of
+   those instead of taking a column of their own beside it. Same reason the legend
+   sits under the plot rather than beside it: the panel is a label column and
+   1225px of map, and the map is what the space is for. */
+/* Capped with the plot, and not just for tidiness: the tools are positioned
+   against this box, so a stage wider than the canvas would leave them floating
+   off the map's corners. */
+.stage { position: relative; width: 100%; }
+/* Square mode changes nothing here. The canvas keeps the full width and the
+   2:1 box it has always had -- so the tools stay in the corner they are
+   positioned against and nothing under the map moves -- and the square is
+   drawn *inside* that box, centred, at the height the box already has. Which
+   plot the map is drawn in is a question about the canvas and the projection,
+   not about the layout; see `SQUARE` in Minimap.tsx. */
+/* One corner, wrapping, rather than a column in each of the top two.
+   A single *column* is what does not work here: six chips down the left edge
+   ran into the diamond's left tip -- which sits at the plot's *vertical
+   middle*, because the widest point of a diamond is halfway down -- and
+   "scroll to zoom" ended up on the terrain. Splitting them across both
+   corners fixed the depth by putting the controls that change the picture on
+   one side and the readouts on the other; dropping the building count left
+   that second group as two chips, which is not a group, and separated the
+   layer's controls from the toggle that turns the layer on.
+
+   So: one cluster in the top right, allowed to wrap. The room a top corner
+   has is a triangle -- the diamond's upper edge cuts in at two pixels of width
+   per pixel of depth -- so what a stack cannot do is be both wide and deep,
+   and a wrap is exactly the shape that obeys that: full rows first, the
+   remainder below, and by the fourth row the only chip left is a short one.
+
+   `max-width` is the wrap's only lever. Too wide and the first row reaches
+   past the diamond's top vertex; too narrow and every chip is its own row and
+   the stack is a column again, back into the tip. Under a third of the plot
+   is about two chips a row here, and four rows for the seven chips that can
+   be showing at once -- which lands at half the depth the corner has. The
+   compact block at the bottom of the file needs a different share of a
+   narrower plot, and says why. */
+.tools {
+  position: absolute; top: var(--space-3); right: var(--space-4);
+  display: flex; flex-wrap: wrap; justify-content: flex-end;
+  align-items: flex-start; gap: var(--space-2);
+  max-width: 32%;
+  /* Clicks belong to the map underneath; the controls take their own back --
+     or the gaps between the chips would swallow a drag. */
+  pointer-events: none;
+}
+.tools > * { pointer-events: auto; }
+/* Over a map that is dark green in one place and bright gold in another, a
+   control needs its own ground to stay readable. One strength for all of them:
+   three different mixes for the same job was three different plates.
+
+   The dimensions are in here too -- they describe the map, so they live on it,
+   and `sub` keeps the mono figures. */
+.tools .toggle, .tools .modes button, .tools .reset, .tools .secs,
+.tools .hint, .tools .sub {
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+/* One box for every chip in the cluster, so their edges line up and their text
+   sits on the same rhythm. It matters more now that they wrap: two chips
+   sharing a row have to be the same height or the row is a step, where a
+   column only had to agree on its left edge. The ones with no border of their
+   own carry a transparent one, or they measure two pixels narrower and their
+   text starts inside the buttons' text. A fixed line-height rather than each
+   chip's own, because they are set at 11, 11.5 and 12px and the mixed heights
+   were what put "168 × 168" off the baseline of the row below it.
+
+   Sized as controls rather than as captions. These are the buttons you aim at
+   over a picture you are also dragging and zooming, and at 11px in a 19px box
+   they were the smallest hit targets on the page -- a miss pans the map. The
+   padding is what carries the growth; the type follows it up so the chips do
+   not come out as text rattling around inside a plate. */
+.tools > * { padding: var(--space-2) var(--space-3); line-height: 1.375rem; font-size: var(--text-control); }
+.tools .toggle, .tools .reset, .tools .hint,
+.tools .modes button, .tools .secs, .tools .secs input { font-size: var(--text-control); }
+/* The figures stay mono and a touch larger again -- they are the one thing in
+   the stack you read as a number rather than press. */
+.tools .sub { font-size: var(--text-control); }
+/* Rounder to match: a 4px radius on a 27px chip reads as a square corner. */
+.tools .toggle, .tools .reset, .tools .secs { border-radius: var(--radius); }
+.tools .modes button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.tools .modes button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+/* Room for three digits now that the window defaults to 120 -- and for the
+   "1.6" and "1.25" the other two chips are typed in. */
+.tools .secs input { width: 2.625rem; }
+.tools .hint, .tools .sub {
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+}
+/* `modes` is the segmented pair; its buttons carry the padding, not the group,
+   and their outer corners are already rounded the two ways they need to be --
+   which is why the box above has to be repeated onto them, or the one chip in
+   the stack that is two buttons comes out six pixels shorter than the rest. */
+.tools .modes { padding: 0; }
+.tools .modes button { padding: var(--space-2) var(--space-3); line-height: 1.375rem; }
+
+.tools .toggle, .tools .reset, .tools .secs { margin-top: 0; }
+.tools .modes { margin-top: 0; }
+
+/* ---- the chips, at compact width ----
+   Everything over the plot is sized in absolute pixels, which is right at
+   1280px and wrong at 640: the stack was covering the map's whole left third
+   and "168 × 168" ran past the diamond's edge. One step down in padding and
+   type, and the corner they sit in is a corner again. Tighter to the edges
+   too -- the large size's inset is proportionally twice as much on half the map.
+
+   The wrap needs more of the width here, not less, and that is not a
+   contradiction: the chips shrink by about a fifth while the plot halves, so
+   at the large size's third of the width every one of them would be its own
+   row and the cluster would grow back down into the diamond's tip. Wider rows
+   are the shallower stack. */
+.compact .tools { top: var(--space-2); right: var(--space-2); max-width: 46%; gap: var(--space-2); }
+.compact .tools > * { padding: var(--space-1) var(--space-2); line-height: 1.125rem; font-size: var(--text-caption); }
+.compact .tools .toggle, .compact .tools .reset, .compact .tools .hint,
+.compact .tools .modes button, .compact .tools .secs,
+.compact .tools .secs input { font-size: var(--text-caption); }
+.compact .tools .sub { font-size: var(--text-small); }
+.compact .tools .modes { padding: 0; }
+.compact .tools .modes button { padding: var(--space-1) var(--space-2); line-height: 1.125rem; }
+.compact .tools .secs input { width: 2.125rem; }

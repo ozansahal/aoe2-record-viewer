@@ -1,0 +1,99 @@
+/* ---- the four small cards ----
+   Between the totals column and the last games, in the same band as both.
+
+   Everything here is borrowed: the fill, the border, the radius and the shadow
+   are the totals card's, the title is the same small grey capitals every label
+   on this page wears, and the value sits at `--text-title`, which is what the
+   card's own figures use. A third thing in an established row should look like one. */
+
+/* Two by two, at a width of its own.
+
+   `flex: none` and a column width rather than a share of the band. A card is
+   four small figures and never wants more room than that, while the list of
+   games beside it is the column that actually reads better wide -- given a
+   share, this took width off the list until its rows stopped fitting on a
+   line. Fixed, it takes what it needs and every pixel the band gains after
+   that goes where it does something. It still wraps to a line of its own when
+   the band runs out, since `.top` wraps.
+
+   175 is where the two columns hold a civ name at the value's size without
+   cutting it, which is what the cards are for. */
+.grid {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, 11rem);
+  gap: var(--space-3);
+}
+
+/* One card. The same chrome as `.totals` on the summary page -- if that shadow
+   or that radius changes, this is the other place it is written. */
+/* The rows stretch to the band's height rather than being packed at the top:
+   the band sets every column to the height of the tallest, and a 2x2 sitting
+   short inside a full-height box read as three columns that had been cut off
+   at different places. The figures stay at the top of each card -- it is the
+   card that grows, not the type inside it. */
+.card {
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-4) var(--space-4);
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 1px 4px color-mix(in srgb, #000 10%, transparent);
+}
+
+/* The title recedes. It is the same faint grey capitals as `.stats dt` next
+   door, and it wraps rather than being cut: "Civ to work on" is two words too
+   long for the column and a title with its end missing is worse than one on two
+   lines. */
+.title {
+  font-size: var(--text-caption); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-faint); line-height: 1.25;
+}
+
+/* The answer. One line, cut off rather than wrapped -- the four cards are a
+   grid and a two-line value in one of them would push its neighbour's figures
+   out of alignment with the row. The full name is on the value's own tooltip. */
+.value {
+  min-width: 0; font-size: var(--text-title); font-weight: 600; color: var(--ink);
+  line-height: 1.15; margin-top: var(--space-hair);
+}
+.name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The rung card's value is the difficulty pill the grid below uses, so the
+   word carries the same colour there and here. It is scaled up: `ui.diffPill`
+   is sized for a table row, and at `--text-small` in a value slot the other
+   three cards fill at `--text-title` this one card would read as the quiet one. Specificity
+   over the shared rule comes from the parent, not from `!important`. */
+.value .pill { font-size: var(--text-control); padding: var(--space-1) var(--space-2); }
+/* Nothing cleared the floor. A dash, not a zero: "no answer" and "you lost
+   them all" are opposite facts. */
+.nil { color: var(--ink-faint); }
+
+/* The rate, and the only colour on the card. Below the value rather than
+   beside it: the value is what the card is about and this is how it went, and
+   at `--text-body` against the value's `--text-title` the eye still lands on
+   the name first.
+
+   Pinned to the foot of the card, with the sample under it. The four cards are
+   one grid row of equal height and their titles are not all one line, so left
+   to sit under the value the rates would step up and down across the row --
+   and four figures you cannot read straight across are four unrelated cards. */
+.rate {
+  margin-top: auto;
+  font-size: var(--text-body); font-weight: 700; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+/* The empty card has no rate, so its one faint line does the pinning instead. */
+.title + .value + .sample { margin-top: auto; }
+
+/* What the rate was out of, and over what stretch. Both qualify the figure
+   above rather than being figures themselves, so they share one faint line --
+   and the scope is on it because the card beside these is usually *tonight*,
+   and an undated rate next to a dated one is read as the same window. */
+.sample {
+  font-size: var(--text-caption); color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The same two colours the record wears everywhere else on this page: the win
+   is the number you read, the total is what it is out of. */
+.wins { color: var(--unit); }
+.of { color: var(--ink-faint); }

@@ -1,0 +1,402 @@
+/* ---- the summary page ----
+   The same saved rows the recordings page lists, added up: one list of dates,
+   each of which opens onto the maps and difficulties the games under it were.
+
+   The panel is built exactly as the files page's is -- a head that stays put,
+   and one thing under it that scrolls -- because they are the two permanent
+   tabs and switching between them should not move the furniture. */
+.summary {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.head {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap;
+  padding: var(--space-4) var(--space-4); border-bottom: 1px solid var(--line); background: var(--panel-2);
+}
+.head > strong, .head > button { flex: none; }
+
+/* Everything below the head, and the only thing that scrolls. */
+.body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4); }
+
+/* ---- where you are now ----
+   The period you are in, ahead of the list. Everything before it is a row
+   below, and every row opens.
+
+   A card rather than a band across the top: it is the one thing on the page
+   that is an answer rather than a table, so it is lifted off the panel with a
+   shadow and given the room to be read at a glance. The fill is the panel's
+   own colour and the shadow is what separates them -- a second grey would make
+   it a heading for the list rather than a thing in its own right.
+
+   It takes the width of what is in it and no more. Stretched to the panel it
+   was a band with three figures at one end and a stretch of empty card at the
+   other, which read as a table with its columns missing rather than as a card. */
+/* The whole top of the page: the two cards in one column, the last games in
+   another beside them. They are one band rather than two stacked blocks
+   because they answer the same question at two grains -- the figures say how
+   the week went and the list says which games that was -- and the dated rungs
+   below are where the page turns into an archive.
+
+   Flex and not a grid, so the column widths come from what is in them: the
+   cards are as wide as their own figures and the list takes everything left.
+   It wraps rather than shrinking -- past about a thousand pixels the roster on
+   a row is down to two names, at which point the list is better off with the
+   full width on a line of its own. */
+.top {
+  /* `stretch`, so the two columns end on the same line. The cards are the
+     taller of the two by construction -- the list asks for no height of its
+     own, see `.list` in RecentGames.module.css -- so the cards set the height
+     and the list fills it. */
+  display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+}
+/* The larger column, and the one that gives: a card is four figures at a fixed
+   size and a row is a whole match, so the room belongs to the list. The basis
+   is the width below which its columns start colliding, which is also where
+   the flex box breaks the line. `margin: 0` because the band owns the gap now
+   -- the panel carries its own only when it is not in one. */
+.top > section {
+  /* Capped, because past a point the width stops going to anything. A row is
+     two fixed lines -- the columns and the roster -- and neither grows: the
+     extra goes to the gap between the duration and the "3 hours ago" pinned at
+     the far end, so on a wide window the rows read as two things at opposite
+     edges of a lot of nothing. This is about where the gap stops being a
+     margin and starts being a distance. */
+  flex: 1 1 28.75rem; min-width: 0; max-width: 56.25rem; margin: 0;
+  /* A column, so the list inside it can take everything under the head. The
+     floor is for the nights when there is only the one card beside it: beside a
+     full pair of stat cards the list would be two rows, and a scroller that
+     holds two of eight is worse than no list at all. */
+  display: flex; flex-direction: column; min-height: 20rem;
+}
+
+/* The card, and the wider windows *under* it rather than beside it.
+   Side by side they read as two answers of equal standing, and they are not:
+   the card is where you are now and the windows are the context that says
+   whether that is a good night or how you play. Stacked, the eye lands on the
+   near figure first and finds the wider ones by reading on. */
+.cards {
+  flex: 0 0 auto;
+  /* `stretch`, not `flex-start`: the column is as wide as its widest card and
+     both then fill it, so the two edges line up down the page. Left to size
+     themselves the second card is the wider of the two -- four labels to the
+     first card's three -- and a card that sticks out by thirty pixels reads as
+     a misalignment rather than as two things of different sizes. The column
+     itself still takes only what the widest card needs, since it is `flex: 0 0
+     auto` in the band above. */
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--space-3);
+}
+/* Neither card may be wider than the column, however long a period's name
+   gets: the band it sits in gives the rest of the width to the list. */
+.cards > * { max-width: 100%; }
+/* A step wider than the two rows want on their own: the rate is set at
+   `--text-display`, which makes the first row tall enough that a tight gap
+   reads as the rows touching. */
+.totals {
+  display: flex; flex-direction: column; gap: var(--space-6);
+  max-width: 100%; margin: 0;
+  padding: var(--space-4) var(--space-6);
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 1px 4px color-mix(in srgb, #000 10%, transparent);
+}
+/*
+ * Every figure on the card is a label over a value, and the rows are just how
+ * many fit: the period and its rate, when it was last played, then games, won
+ * and lost. The rate is bigger because it is the answer -- see .bigNum -- and
+ * it is a `dd` like the rest, so it sits under its own label rather than
+ * beside it.
+ */
+.stats { display: flex; gap: var(--space-7); flex-wrap: wrap; margin: 0; align-items: baseline; }
+.stats dt {
+  font-size: var(--text-small); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint);
+  white-space: nowrap;
+}
+.stats dd {
+  margin: 0; font-size: var(--text-title); font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* The rate and, beside it, how it compares with the period below it. */
+.rateCell { display: flex; align-items: baseline; gap: var(--space-2); }
+/* The one figure on the card that is the answer rather than part of it. */
+.bigNum { font-size: var(--text-display); line-height: 1.05; letter-spacing: -0.02em; font-weight: 700; }
+/* Points up or down, at the size of the other values rather than of the one it
+   is attached to: it qualifies the rate, and a 40px delta beside a 40px rate
+   would read as two numbers of equal standing.
+
+   Inline rather than a flex box of its own. A flex box takes its baseline from
+   its first item -- which here is the triangle, a replaced element whose
+   baseline is its bottom edge -- so the number inside it rode a few pixels
+   above the rate it is sitting next to. Inline, the box's baseline is the
+   text's own, which is the one the card is aligning on. */
+.delta {
+  font-size: var(--text-body); font-weight: 600; color: var(--ink-faint); white-space: nowrap;
+}
+/* Sits on the baseline like the digits beside it; the margin is the gap the
+   flex box used to give it. */
+.arrow { width: 0.5rem; height: 0.5rem; margin-right: var(--space-1); }
+
+/* ---- the wider windows ----
+   The week and the thirty days, in a card under the first one and built to
+   the same pattern: the same chrome, the same small capitals over the same
+   values, in the same order. Three cards in three shapes read as three
+   unrelated things; what these are is the card's question asked over two
+   longer stretches, and they should look like it.
+
+   Size is the whole of the hierarchy between them. The rate here is 25px
+   where the card's is 40 -- big enough to be the figure on its row, small
+   enough that the eye still lands on the card first.
+
+   A grid, so the columns line up down the card rather than starting wherever
+   the period's name happened to end. Four columns because that is what a row
+   holds; the rows inside it are `display: contents` -- see .windowRow. */
+.windows {
+  display: grid; grid-template-columns: repeat(4, max-content);
+  align-content: center; column-gap: var(--space-7); row-gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 1px 4px color-mix(in srgb, #000 10%, transparent);
+}
+/* One period. It is a `dl` for the same reason the card's rows are -- every
+   figure on it is a value under its own label -- and it takes no box of its
+   own, so the pairs inside it are the grid's cells and line up with the
+   period above. */
+.windowRow { display: contents; margin: 0; }
+/* The line between one period and the next. It spans every column and runs out
+   into the card's padding, so it reads as the card being divided rather than
+   as an underline under the figures. */
+.rule {
+  grid-column: 1 / -1; height: 0;
+  margin: 0 calc(var(--space-6) * -1); border-top: 1px solid var(--line);
+}
+.windows dt {
+  font-size: var(--text-small); letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint);
+  white-space: nowrap;
+}
+.windows dd {
+  margin: 0; font-size: var(--text-title); font-weight: 600; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* The row's own figure, as the rate is on the card: the one thing on the line
+   that is an answer rather than what the answer was out of. */
+.windows dd.windowRate { font-size: var(--text-figure); font-weight: 700; letter-spacing: -0.01em; }
+
+/* ---- the panel ----
+   The list of dates. Its head is the table's own heading row -- see .thead. */
+.panel {
+  border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  min-width: 0; background: var(--panel);
+}
+/* Sentence case, at the far end of the line it is on: what the squares of the
+   grid hold, said once rather than as a heading over every column. */
+.aside { text-transform: none; letter-spacing: 0; font-size: var(--text-small); }
+
+/* ---- the tables ----
+   Grid rather than a real <table>: a period row is a button, and a button
+   cannot be a <tr>. The columns are declared once here, which is what keeps
+   the list and the tables inside it lined up with each other.
+
+   Won and played share a column -- see `Figures` -- which is what leaves the
+   first column wide enough for a map name. */
+.table { display: flex; flex-direction: column; }
+.trow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.5rem 3.25rem 5rem;
+  align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line);
+  font-size: var(--text-control); color: var(--ink-dim); text-align: left;
+  /* Said here rather than on the button rule below, so a header row and a
+     row that opens are the same height. */
+  border-left: 0; border-right: 0; border-top: 0; background: none; font-family: inherit;
+}
+.table > *:last-child { border-bottom: 0; }
+/* The head of the panel as well as the head of the table -- there is no titled
+   bar above it any more, so it wears that bar's fill and its capitals. */
+.thead {
+  font-size: var(--text-small); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint); background: var(--panel-2);
+  padding-top: var(--space-2); padding-bottom: var(--space-2);
+}
+/* The name column. A map name is long and the panel is not always wide. */
+.key {
+  min-width: 0; display: flex; align-items: center; gap: var(--space-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink);
+}
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Won out of played, as one figure: the win is the number you read and the
+   total is what it is out of, so only the first is in the win colour. */
+.record { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wins { color: var(--unit); }
+.of { color: var(--ink-faint); }
+.losses { color: var(--red); }
+
+/* ---- a date, and what is under it ----
+   The wrapper owns the rule between rows, because the row itself is only the
+   top half of it once the detail is open. */
+.group { display: flex; flex-direction: column; border-bottom: 1px solid var(--line); }
+.group .trow { border-bottom: 0; }
+/* An open one is a block rather than a line: it gets the rule above it too, so
+   the two halves read as one thing rather than as a row with a panel loose
+   underneath. */
+.opened { border-top: 1px solid var(--line); margin-top: -1px; }
+
+/* The date itself: a disclosure, so the whole row is the control. */
+.pickable { width: 100%; cursor: pointer; }
+.pickable:hover { background: var(--panel-2); }
+/* Open, and marked down its left edge the way a row in a tab strip is -- an
+   inset shadow rather than a border, so nothing moves by a pixel when it
+   opens. */
+.on { background: var(--panel-2); box-shadow: inset 4px 0 0 var(--accent); }
+.on .key { color: var(--accent); font-weight: 600; }
+.pickable:focus-visible { outline: 1px solid var(--accent); outline-offset: -2px; }
+
+/* Points right when the row is shut and down when it is open. A sixth of a
+   second, which reads as the row opening rather than as an animation. */
+.chevron {
+  flex: none; width: 0.625rem; height: 0.625rem; color: var(--ink-faint);
+  transition: transform .15s ease;
+}
+.down { transform: rotate(90deg); }
+.on .chevron { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
+
+/* What an open date reveals: the grid, on the page's own colour and inset from
+   the row above, so it reads as being inside the row rather than as more rows
+   of the list. */
+.detail {
+  padding: var(--space-4); background: var(--bg);
+  border-top: 1px solid var(--line);
+  /* The same 4px the open row is marked with, continued down the side of
+     what it opened, so the block has one left edge. */
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+/* What the grid is, and what is in its squares. The second half is a legend,
+   not a column heading -- every square is the same figure, and saying it once
+   up here is what lets them stay bare numbers. */
+.detailHead {
+  display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2);
+  font-size: var(--text-small); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ---- difficulty by map ----
+   The scroller, for a period with more maps than there is width. Only this
+   scrolls: the page below it must not move sideways because one open year has
+   twenty maps in it. */
+.matrixWrap {
+  overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel);
+}
+/*
+ * One grid, not a grid of rows: the columns have to line up across every row,
+ * and their number is data -- it is set from the code, since a week is three
+ * maps and a year is twenty.
+ */
+.matrix { display: grid; min-width: max-content; }
+/* The rows are there for the reader (`role="row"`), not for the layout: their
+   boxes would break the one grid the columns are declared on. `display:
+   contents` takes the box away and leaves everything else -- the element is
+   still in the DOM, so every rule below reaches the squares *through* it and
+   none of them can be written as a child of `.matrix`. */
+.mrow { display: contents; }
+
+.mrow > * {
+  padding: var(--space-2) var(--space-3);
+  /* Ruled both ways, faintly. The squares are tinted and touch each other, so
+     without the lines two neighbours of similar colour read as one band. */
+  border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
+  font-size: var(--text-small); text-align: right; font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mrow:last-child > * { border-bottom: 0; }
+.mrow > :last-child { border-right: 0; }
+/* The map names. Left-aligned with the figures under them right-aligned would
+   be two columns; these are the same column, so the heading goes where the
+   numbers are. Cut off rather than wrapped: a wrapped name would set the
+   height of the whole header row. */
+.mhead {
+  /* Dim rather than faint: these are the columns you are looking along, and
+     at `--text-caption` uppercase the faintest grey reads as disabled. */
+  background: var(--panel-2); color: var(--ink-dim);
+  font-size: var(--text-caption); letter-spacing: .05em; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis;
+}
+/* The difficulty column, pinned while the maps scroll under it: a row of
+   figures with the rung it belongs to scrolled off is unreadable. */
+.corner {
+  position: sticky; left: 0; z-index: 1;
+  text-align: left; background: var(--panel);
+}
+.mhead.corner { background: var(--panel-2); }
+.rung { color: var(--ink-dim); font-size: var(--text-small); }
+
+/* A square. */
+.cell { color: var(--ink); }
+/* The record restated as a rate. Smaller and faint, because it is the same
+   fact as the two numbers before it -- a column of these at full size reads as
+   another figure to compare. */
+.pct { font-size: var(--text-caption); color: var(--ink-faint); margin-left: var(--space-1); }
+/* Nothing was played here, which is not the same as having lost it. */
+.nil { color: var(--ink-faint); }
+
+/* The totals: the last column of every row, and the last row of the grid.
+   They are the two breakdowns this grid replaced, so they are marked off from
+   the squares they are the sums of. */
+.mrow > :last-child {
+  border-left: 1px solid var(--line); font-weight: 600; background: var(--panel-2);
+}
+/* The totals row is at the top, under the map names, so what sets it off is
+   the rule the base rule already draws below it and the weight of the figures
+   -- it needs nothing above it, where the header row's own edge already is.
+   The fill is the panel's second shade, which is what the row and the column
+   of totals have in common with the map names above them. */
+.mrow.edge > * { font-weight: 600; background: var(--panel-2); }
+
+/* Wins out of the games, as a length. The track is the losses: a second
+   colour there would read as two things being compared rather than as one
+   part of a whole. */
+.bar {
+  display: block; height: 0.375rem; border-radius: var(--radius-pill); overflow: hidden;
+  background: var(--panel-2); border: 1px solid var(--line);
+}
+.pickable:hover .bar, .on .bar { background: var(--panel); }
+.fill { display: block; height: 100%; background: var(--unit); }
+
+/* A table with nothing in it, and the footnotes under the page. */
+.none, .foot {
+  margin: 0; padding: var(--space-3) var(--space-4);
+  font-size: var(--text-small); color: var(--ink-faint);
+}
+.foot { padding: var(--space-3) var(--space-1) 0; }
+.empty { padding: var(--space-7) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); color: var(--ink-dim); }
+
+/* ---- the welcome ----
+   The summary is the tab the app opens on, in both hosts, and on a first run
+   it has nothing to add up -- it is arithmetic over games that are kept, and
+   there are none. An explanation of what this is has nowhere better to be
+   than the page that is otherwise blank.
+
+   It needs no dismiss button because it is not persistent: the first kept
+   game replaces it with the summary itself, which is the thing it is
+   describing. Measured out to a reading width rather than the card's, since
+   this is the one place on the page that is prose. */
+.welcome { padding: var(--space-7) var(--space-6); max-width: 46rem; }
+.welcomeTitle {
+  margin: 0; font-size: var(--text-title); font-weight: 600;
+  letter-spacing: -0.01em; color: var(--ink);
+}
+.lead { margin: var(--space-3) 0 0; font-size: var(--text-body); line-height: 1.55; color: var(--ink-dim); }
+.points { margin: var(--space-5) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-3); }
+.points li {
+  position: relative; padding-left: var(--space-4);
+  font-size: var(--text-control); line-height: 1.5; color: var(--ink-dim);
+}
+/* A mark rather than a bullet glyph: these are four claims, not an ordered
+   list, and the browser's own disc sits too far from the text at this size. */
+.points li::before {
+  content: ""; position: absolute; left: 0; top: .6em;
+  width: 4px; height: 4px; border-radius: 50%; background: var(--accent);
+}
+.points strong { color: var(--ink); font-weight: 600; }
+.welcome button { margin-top: var(--space-6); }
+

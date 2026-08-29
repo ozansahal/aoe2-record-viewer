@@ -1,0 +1,168 @@
+/* ---- one recording, as a line ----
+   Shared by the recordings page and the summary's last-games list, so the two
+   are the same row and not two drawings of it. Everything here is about the
+   *game*; anything about the file it came out of belongs to whichever page is
+   showing it. */
+
+/* The line, and what the row is actually about: the map, how hard, how long,
+   and who played.
+
+   `nowrap`, and it matters more than it looks.
+
+   Wrapping, a row too narrow for its three columns re-stacks them: the map and
+   the difficulty on one line, the duration on the next, the roster under that.
+   Every rule in this file promises the opposite -- that a row is the same
+   height as the row above it, so the list reads down -- and a list where the
+   rows are one, two or three lines depending on how much room the page had is
+   the thing the columns were for. Squeezed, the map gives instead (see below)
+   and the columns stay put. */
+.what {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap;
+  max-width: 100%; font-size: var(--text-control); color: var(--ink-dim);
+  /* Fill the row rather than shrink-wrapping to it.
+     Both lists stack this in a column flex box that aligns to the start, so
+     without this the line is sized to its own max-content -- and a flex box's
+     max-content is not the sum of what its children would like: the roster
+     came out 160px against the 240px of names in it, with 700px of row
+     unused beside it. Stretched, the line is the row and the roster takes what
+     the three columns leave. `align-self`, not `width: 100%`, so a caller that
+     ever puts this in a *row* box gets a harmless no-op instead of an item
+     claiming the whole line. */
+  align-self: stretch;
+}
+/* The three things every parsed row has, each in a column of its own width.
+   Fixed rather than sized to content: a list is read down, and a map name is
+   the one field here long enough to push everything after it somewhere
+   different on every line. They keep their width empty, too -- a row with no
+   difficulty leaves the gap rather than pulling its duration left out of the
+   column. Narrow enough that the roster, which is what the width is really
+   for, still gets most of the line. */
+.map, .diff, .dur { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The one column that gives. 185 is the width it takes when the list has the
+   room -- which is what puts every duration in the same place down the page --
+   but it is a name, so it can be cut, and the other two cannot: a pill has a
+   width of its own and a duration read half is not a duration. So this is the
+   column that shrinks when a narrower list has to fit its three, and it
+   ellipsises rather than taking the row's shape with it. */
+.map {
+  flex: 0 1 11.5rem; min-width: 0;
+  color: var(--ink); font-weight: 550;
+}
+/* Set by the page rather than by a selector of its own: "already open in a
+   tab" is something the list around the row knows and the row does not, and a
+   descendant selector cannot reach across two stylesheets in any case. */
+.accent { color: var(--accent); }
+/* A flex box rather than a line of text: the pill inside it is an inline-block
+   otherwise, which sits on a baseline and reserves the descender space under
+   it -- three pixels the row does not otherwise have, on every row in the
+   list. Centred, so a pill shorter than the line stays with it. */
+.diff { width: 5.25rem; display: flex; align-items: center; }
+.dur { width: 4.25rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+
+/* The two lines, where the caller asked for the roster on its own -- see
+   `stack` in GameLine.tsx. A column that takes the width, so the roster below
+   gets all of it rather than the remainder of the line above. */
+.stacked {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-start;
+}
+/* The roster on its own line. Cut at the width rather than wrapped: every row
+   in the list is the same height, and the whole roster -- with civs, and with
+   who won -- is on the row's tooltip either way.
+
+   The three rules under it are the ones `.roster` already needs for the same
+   reason, and for the same reason they cannot be inherited: the names are
+   `inline-flex`, and an ellipsis is only drawn for inline-level content, so
+   each has to be an `inline-block` inside a line that clips. */
+.players {
+  max-width: 100%; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  /* The same size and colour as the line above it, which is the same size the
+     recordings page draws its roster at -- on one line the names are inside
+     `.what` and take these for free, and stacked they would otherwise inherit
+     the document's `--text-body` and come out a step larger than the same
+     names in the other list. */
+  font-size: var(--text-control); color: var(--ink-dim);
+}
+.players > .side { display: inline-block; }
+.players > .side + .side { margin-left: var(--space-3); }
+.players .crown { vertical-align: middle; margin-right: var(--space-1); }
+/* `.side` is an inline-flex with a gap, and turning it into an inline-block
+   throws that gap away -- so the civ ran straight into the name it belongs to.
+   Put it back as a margin, which is what an inline box has.
+
+   Both boxes, not just the stacked one: the roster carries civs now that every
+   row builds one, where before it only ever held the four-or-more case, which
+   drops them. */
+.players .civ, .roster .civ { margin-left: var(--space-2); }
+
+/* The gutter the two marks live in: a column, so a multiplayer game you won
+   stacks them in the one lane rather than widening the row or pushing the map
+   column right. Centred against the row, and holding its width on every row
+   that has neither mark. */
+.gutter {
+  flex: none; width: 2rem;
+  /* The gap is generous for two marks this small: touching, the pill and the
+     crown read as one badge with something stuck to it. */
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+}
+/* Multiplayer, which is the difference between a match and a practice run.
+   A pill rather than a word: it has to be findable by shape while the eye
+   goes down the column, not read. */
+.mp {
+  display: block; width: 100%;
+  font-size: var(--text-caption); font-weight: 650; letter-spacing: .06em; text-align: center;
+  /* Tracking leaves its space after the last letter too, which centring then
+     counts as part of the word -- so the pair sits a hair left. Push it back
+     by exactly what the trailing gap is. */
+  text-indent: .06em;
+  color: var(--accent); padding: var(--space-hair) 0; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* One player: crown, name in their in-game colour, civ. Centre-aligned rather
+   than on the baseline, because the crown is an image and would hang off one. */
+.side { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+/* A lobby of them, on the one line that is left. Every row in the list is the
+   same height, so a roster that does not fit is cut at the width rather than
+   wrapped -- the names are in seat order, the first ones are the ones on
+   screen, and the whole roster is on the row's tooltip either way.
+   `inline-block` on the names, not `inline-flex`: an ellipsis is drawn for
+   inline-level content, and a flex child would simply be clipped. */
+.roster {
+  /* `1 1 auto`, and the `auto` is the whole of it. `flex: 1` is `1 1 0%`, so
+     the box contributes *nothing* to the width its row asks for -- the line
+     sizes itself to the three columns as though the names were not there, and
+     then hands the roster whatever is left, which on a row that fits exactly
+     is nothing. Every name came out cut to its first word beside an empty half
+     of the row. With `auto` the basis is the names themselves: the line asks
+     for room for them, and the ellipsis is what happens when a row really is
+     too narrow rather than the normal case. */
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Baseline-aligned, which is the default and what is wanted: the names line
+   up with the map and the duration beside them. Centring the box instead
+   pushes it above the strut and makes every multiplayer row taller. */
+.roster .side { display: inline-block; }
+/* The gap between two names, since they are no longer flex items with a gap
+   of their own. On the box rather than as a separator element, so nothing is
+   left dangling when the line is cut between two names. */
+.roster .side + .side { margin-left: var(--space-3); }
+/* Inline again here, so it sits in the line box rather than in a flex row.
+   `middle` keeps it inside the strut: anything that hangs below the baseline
+   makes the line -- and so every multiplayer row in the list -- taller than
+   the rows either side of it. */
+.roster .crown { vertical-align: middle; margin-right: var(--space-1); }
+.civ { color: var(--ink-faint); font-size: var(--text-small); }
+/* Sized against the `--text-control` line it sits in, and gold in both themes --
+   the one
+   thing in the list that is neither ink nor a player colour. */
+.crown { width: 1rem; height: 0.75rem; flex: none; fill: var(--gold); }
+
+/* The same crown in the gutter, where it says the game was yours rather than
+   which side took it. Bigger than the one beside a name -- it is being picked
+   out of a column at a glance, not read as part of a line -- and given the
+   width of the lane so it centres under the MP pill above it. */
+.win { display: flex; justify-content: center; width: 100%; }
+.win .crown { width: 1.125rem; height: 0.875rem; }

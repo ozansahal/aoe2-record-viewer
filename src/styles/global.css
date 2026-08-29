@@ -1,0 +1,185 @@
+/*
+ * The only stylesheet that is not a module: everything here is deliberately
+ * global, because scoping it would defeat it.
+ *
+ * Design tokens, the document reset, and the scrollbar. Nothing that belongs
+ * to a component -- if a rule names something you can point at on screen, it
+ * belongs in that component's `.module.css` instead.
+ */
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --panel-2: #f0f2f5;
+  --line: #dfe3e8;
+  --ink: #1b1f24;
+  --ink-dim: #5c6672;
+  --ink-faint: #8b949e;
+  --accent: #3b6fd4;
+  --build: #c47f2e;
+  --tech: #7b58c4;
+  --unit: #2f8f6b;
+  --red: #d0524a;
+  /* The winner's crown, and nothing else. Not --build: that amber means the
+     build category, and a list row is no place to say so. */
+  --gold: #b8860b;
+  /* Difficulty, as a ramp rather than six unrelated colours: the eye should
+     be able to read the order off the hue while going down a list, without
+     reading the word. Cool and green at the bottom, hot in the middle, and
+     off the red end entirely at the top -- Extreme is not "more red than
+     Hardest", it is a different thing, so it gets the one hue nothing else
+     in the list uses.
+
+     These are pill fills rather than text colours, so each is picked to clear
+     4.5:1 against --diff-ink -- the one foreground all six share, since a pill
+     that changed its text colour with its fill would read as six unrelated
+     badges instead of one scale. */
+  --diff-ink: #ffffff;
+  --diff-easiest: #1f7a58;
+  --diff-standard: #5c7a1f;
+  --diff-moderate: #8f6708;
+  --diff-hard: #a84f22;
+  --diff-hardest: #b23f38;
+  --diff-extreme: #8138ad;
+  /* The win-rate ramp: five bands rather than a green/red verdict, because a
+     record is read as a grade. Cyan at the top, then green, yellow, orange,
+     red -- the order every ladder uses, so it needs no key. These are text
+     colours over --panel, so each is darkened here and lifted in the dark
+     theme below; the ramp's *order* is what carries the meaning, and it has to
+     survive both. See `rateColor` in lib/format.ts for where the bands fall. */
+  --rate-elite: #0e8ea3;
+  --rate-good: #2f8f6b;
+  --rate-fair: #8f6708;
+  --rate-poor: #b8641f;
+  --rate-bad: #c4443c;
+  --thumb: #c3cad3;
+  --thumb-hover: #a2acb9;
+
+  /* ---- sizing ----
+     Every length below is rem against the browser's own 16px root, which is
+     left alone: `1rem` means here what it means everywhere else.
+
+     This replaced a blanket 1.25 multiplied through four hundred separate
+     declarations -- which is why so many of them used to end in .25 or .75,
+     and why every hairline had grown to 1.25px.
+
+     The grid is 2px, an eighth of a rem, and the spacing steps below take
+     every other one of those. Nothing lands between two device pixels and
+     nothing needs a decimal past a quarter. */
+
+  /* Type. Seven steps for what was fifteen sizes before the multiply was
+     unwound -- the extra eight were half-pixels sitting less than a point from
+     a neighbour, which is not a distinction anyone can see. */
+  --text-caption: 0.75rem;    /* 12 -- the % beside a rate, the smallest caps */
+  --text-small: 0.875rem;     /* 14 -- eyebrows, hints, dimmed secondary text */
+  --text-control: 1rem;       /* 16 -- buttons, tabs, names, the meta bar */
+  --text-body: 1.125rem;      /* 18 -- the document default, and a player's name */
+  --text-title: 1.375rem;     /* 22 -- stat values and section headings */
+  --text-figure: 1.5rem;      /* 24 -- the window rate */
+  --text-display: 2.5rem;     /* 40 -- the one number the summary opens with */
+
+  /* Space, on a 4px grid. */
+  --space-hair: 0.125rem;     /* 2 -- a gap that is really a separator */
+  --space-1: 0.25rem;         /* 4 */
+  --space-2: 0.5rem;          /* 8 */
+  --space-3: 0.75rem;         /* 12 */
+  --space-4: 1rem;            /* 16 */
+  --space-5: 1.25rem;         /* 20 */
+  --space-6: 1.5rem;          /* 24 */
+  --space-7: 2rem;            /* 32 */
+
+  /* Corners, on the 2px grid rather than the 4px one: a radius reads at half
+     the size a gap does. */
+  --radius-xs: 0.125rem;      /* 2 */
+  --radius-sm: 0.25rem;       /* 4 */
+  --radius: 0.5rem;           /* 8 */
+  --radius-lg: 0.625rem;      /* 10 */
+  --radius-pill: 999px;       /* not a size: whatever it takes to close the ends */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171b;
+    --panel: #1c2026;
+    --panel-2: #22272e;
+    --line: #2d333b;
+    --ink: #e6edf3;
+    --ink-dim: #9aa5b1;
+    --ink-faint: #6e7781;
+    --accent: #5b8dee;
+    --build: #d99a4e;
+    --tech: #a486e0;
+    --unit: #4fb98b;
+    --red: #e06c66;
+    --gold: #e0b341;
+  /* Light fills on the dark palette, so the shared foreground flips with
+     them -- same reasoning, opposite end. */
+  --diff-ink: #14171b;
+  --diff-easiest: #4fb98b;
+  --diff-standard: #8fbf4f;
+  --diff-moderate: #e0b341;
+  --diff-hard: #e2884f;
+  --diff-hardest: #e06c66;
+  --diff-extreme: #b98be0;
+  --rate-elite: #4fc7dd;
+  --rate-good: #4fb98b;
+  --rate-fair: #e0b341;
+  --rate-poor: #e2884f;
+  --rate-bad: #e06c66;
+    --thumb: #3a424c;
+    --thumb-hover: #4d5761;
+  }
+}
+
+/* ---- scrollbars ----
+   Chromium's own is a light slab on a track that reads as a second border down
+   the edge of the window, and it does not change with the dark palette. This is
+   the same bar in the app's colours: no track at all, and a rounded thumb held
+   3px in from either side so it floats in the gutter rather than filling it.
+   The inset is a transparent border with the fill clipped to the content box --
+   `padding` does nothing on a scrollbar part.
+
+   In px, and deliberately: a scrollbar is a thing the pointer has to hit, so it
+   is sized against the screen rather than against the type. The rem scale above
+   does not reach it.
+
+   Not an overlay: the pane's own content would slide underneath it. The gutter
+   stays 16px wide vertically and the cards stop short of it. */
+::-webkit-scrollbar { width: 16px; height: 15px; }
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner { background: transparent; }
+/* A hairline down the inside edge of the vertical gutter, so the bar reads as
+   its own strip rather than as empty space beside the content. Drawn as an
+   inset shadow, not a border: a border on the track eats into the 15px the
+   thumb's own transparent inset is measured against. */
+::-webkit-scrollbar-track:vertical { box-shadow: inset 1px 0 0 var(--line); }
+::-webkit-scrollbar-thumb {
+  background-color: var(--thumb);
+  background-clip: content-box;
+  /* The vertical gutter is 16px: 1px of hairline plus the 15px the thumb is
+     centred in, so the extra left border below is the line, not an offset. */
+  border: 3px solid transparent;
+  border-left-width: 4px;
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--thumb-hover); }
+/* Firefox has no scrollbar parts, so it gets the thin bar and the colour and
+   nothing else. Guarded rather than left to cascade: Chromium supports both
+   spellings, and setting `scrollbar-color` there drops it back to the plain
+   thin bar instead of the thumb above. Only the dev server ever lands here --
+   the packaged app is Chromium. */
+@supports not selector(::-webkit-scrollbar-thumb) {
+  * { scrollbar-width: thin; scrollbar-color: var(--thumb) transparent; }
+}
+
+* { box-sizing: border-box; }
+/* The window never scrolls; the app's own pane does. An app in its own frame
+   with a bar pinned to the top has nothing to gain from a document scrollbar,
+   and under Electron it drew a second one down the edge of the window. */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font: var(--text-body)/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+#root { height: 100%; display: flex; flex-direction: column; min-height: 0; }

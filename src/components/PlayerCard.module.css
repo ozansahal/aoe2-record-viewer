@@ -1,0 +1,76 @@
+/* ---- player cards ---- */
+.player {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius);
+  /* `clip` still rounds the corners but, unlike `hidden`, does not make the
+     card a scroll container -- which would pin the sticky header to the card
+     instead of the viewport. `hidden` first as a fallback. */
+  overflow: hidden;
+  overflow: clip;
+}
+/* Sticky against the viewport, so it stops where the window's own chrome ends
+   rather than sliding under it. */
+.phead {
+  display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); border-left: 5px solid var(--pc, var(--accent));
+  /* Pins flush against the top of the scrolling pane, which already starts
+     below the chrome. Negative because a sticky offset is measured from the
+     scrollport's *content* box: plain `top: 0` would hold it one --pane-pad-top
+     lower and leave a strip of card scrolling past above it. The property is
+     set on .wrap in App.module.css and inherits down to here. */
+  position: sticky; top: calc(-1 * var(--pane-pad-top)); z-index: 2; background: var(--panel);
+}
+.phead b { font-size: var(--text-body); }
+.phead .civ { font-size: var(--text-control); color: var(--ink-dim); }
+
+/* Age-ups are completions from `uptimes`, not commands, so they live here
+   rather than mixed into the per-category counts below. */
+.ages {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-5); background: var(--panel-2); border-bottom: 1px solid var(--line);
+}
+.ages .lbl {
+  font-size: var(--text-small); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--ink-faint); margin-right: var(--space-1);
+}
+/* Also the button that seeks to that age. `composes` strips the browser's
+   button chrome and brings the focus ring; everything the chip is -- the
+   border, the padding, the pill radius -- is restated after it and wins,
+   because the composing file is emitted last. */
+/* `composes` has to sit on a lone class, so the reset comes in here and every
+   rule that has to beat it is scoped under `.ages` below.
+   It does have to beat it: `seek` strips a button's border, padding and
+   background, which is most of what a pill *is*. Leaving the chip's own
+   declarations at one class made the outcome depend on which stylesheet the
+   bundler happened to emit first -- the chip lost its border and its padding
+   while the row times in CategoryColumn, written the same way, kept theirs.
+   Two classes decide it outright, whatever the order. */
+.ageChip { composes: seek from "../styles/ui.module.css"; }
+.ages .ageChip {
+  font-size: var(--text-small); border-radius: var(--radius-pill); padding: var(--space-hair) var(--space-3);
+  border: 1px solid var(--line); color: var(--ink-faint);
+  font-variant-numeric: tabular-nums; transition: opacity .12s ease;
+}
+.ages .ageChip.reached {
+  color: var(--ink); border-color: var(--pc, var(--accent));
+  background: color-mix(in srgb, var(--pc, var(--accent)) 14%, transparent);
+}
+/* Both arms, because a reached chip is three classes deep and a hover that is
+   only two would never show on the ones you are most likely to point at. */
+.ages .ageChip:hover, .ages .ageChip.reached:hover {
+  color: var(--ink); border-color: var(--pc, var(--accent));
+}
+/* The two ends of a finished game. Same chip, and they differ only in colour:
+   green for the side left standing, red for the player who gave up. */
+.win, .resigned {
+  font-size: var(--text-small); font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  border: 1px solid currentColor; border-radius: var(--radius-pill); padding: var(--space-hair) var(--space-2);
+}
+.win { color: var(--unit); }
+.resigned { color: var(--red); }
+.ai {
+  font-size: var(--text-small); color: var(--ink-faint);
+  border: 1px solid var(--line); border-radius: var(--radius-pill); padding: var(--space-hair) var(--space-2);
+}
+
+.cats { display: grid; grid-template-columns: repeat(3, 1fr); }

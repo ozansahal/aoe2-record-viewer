@@ -1,0 +1,108 @@
+/* ---- the open recordings ----
+   Inside the chrome, under the toolbar, so it holds still while the match
+   scrolls beneath it. A tab is a whole document -- its own playhead, mode,
+   sort and window -- and the strip is the only way back to one.
+
+   It scrolls sideways rather than wrapping: a second row would change the
+   height of the chrome, and everything sticky below is positioned from it. */
+.tabs {
+  display: flex; align-items: stretch; gap: var(--space-1);
+  padding: var(--space-2) var(--space-6) 0;
+  /* Down onto the chrome's accent rule, by exactly its width: every tab now
+     overlaps the line, the transparent ones let it through, and the open one
+     paints over it. Descendants paint above the parent's border, so nothing
+     needs a stacking context for this. */
+  margin-bottom: -1px;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; /* the strip is short; a bar under it reads as a border */
+  -webkit-app-region: no-drag; app-region: no-drag;
+}
+.tabs::-webkit-scrollbar { height: 0; }
+
+/* Floored and capped: a tab is never so narrow that its label is only the
+   ellipsis, and one long name cannot take the strip to itself -- recordings
+   named by the game are all about the same length, and all of it is date.
+   Past the floor the tabs stop shrinking and the strip scrolls instead. Both
+   numbers are for one line of text; they were wider when there were two. */
+.tab {
+  display: flex; align-items: center; flex: 0 1 auto;
+  min-width: 9.25rem; max-width: 13.5rem;
+  border: 1px solid var(--line); border-bottom: 1px solid transparent;
+  border-radius: var(--radius) var(--radius) 0 0;
+  /* The fill stops at the padding box, so the hover shade cannot paint under
+     the transparent bottom border and take a bite out of the rule the tab is
+     standing on. Only the open tab is meant to break that line, and it says so
+     itself below. Nothing is lost on the other three sides: those borders are
+     opaque, so there was never anything to see under them.
+
+     Every fill below this is `background-color` and not `background`: the
+     shorthand resets the clip to `border-box`, which is exactly the bug this
+     is here to fix -- the hover shade was setting it back and eating the
+     rule. */
+  background-clip: padding-box;
+}
+.tab:hover { background-color: var(--panel-2); }
+/* The tab the accent rule runs into: the same colour over the top and down
+   both sides, and open at the bottom, where its fill covers the pixel of rule
+   it is sitting on. The bottom border is still in the box -- transparent, with
+   the fill painting under it -- so it is that fill, not a gap, that puts the
+   break in the line. */
+.tab.active {
+  /* The page's own colour, not the panel's: a tab that is a shade lighter than
+     what is under the rule reads as a chip sitting on the strip. The same
+     colour, and the break in the rule is the tab opening onto the page. It has
+     to be a fill and not `transparent` -- it is what covers the rule. */
+  background-color: var(--bg);
+  border-color: var(--accent); border-bottom-color: transparent;
+  /* The one tab whose fill is meant to reach under its bottom border. */
+  background-clip: border-box;
+}
+/* A page tab -- Summary, or Recordings. One word and a glyph, and always the
+   same ones, so it sizes to itself rather than sharing the strip's width with
+   the recordings. */
+.page { flex: 0 0 auto; min-width: 0; }
+/* Recordings closes and Summary does not, so only one of the two carries the
+   button -- and the padding that stands in for it on the other has to match,
+   or the two tabs read as different shapes. .pick already ends at 13.75 on a
+   page tab; this is the rest of the close button's width. */
+.page .close { width: 1.75rem; }
+/* One line: the name and nothing else. The map used to sit under it, which
+   made every tab two rows tall for a word that is on the match itself. */
+.pick {
+  display: flex; align-items: center; min-width: 0; flex: 1;
+  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-3);
+  border: 0; background: none; cursor: pointer; text-align: left;
+  /* Faint rather than dim: with the accent underline gone, the difference
+     between the open tab and the rest of the strip is the fill and the text,
+     and one shade of grey between them was not enough to see at this size. */
+  color: var(--ink-faint);
+}
+.tab.active .pick { color: var(--ink); }
+.page .pick { gap: var(--space-2); padding-right: var(--space-4); }
+.name {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--text-control); font-weight: 600; letter-spacing: .01em;
+}
+/* The whole right end of the tab, full height and hard against the edge.
+   It used to be an 18px square with a margin around it, which left a dead
+   frame -- 6px to its right, 4px above, 5px below -- that belonged to neither
+   this button nor the one that picks the tab: the pointer sat next to the
+   glyph, nothing lit up, and the click did nothing. */
+.close {
+  flex: 0 0 auto; align-self: stretch; display: grid; place-items: center;
+  width: 2rem; margin: 0; padding: 0;
+  border: 0; background: none; cursor: pointer; color: var(--ink-faint);
+}
+/* What is actually drawn: the same small pill as before, centred in that area
+   rather than being the area. */
+.close > span {
+  display: grid; place-items: center;
+  width: 1.375rem; height: 1.375rem; border-radius: var(--radius);
+  font-size: var(--text-small); line-height: 1;
+}
+.close:hover > span { background: var(--red); color: #fff; }
+.pick:focus-visible { outline: 1px solid var(--accent); outline-offset: -2px; }
+/* On the pill, not on the full-height button: a ring round the whole right
+   end of the tab reads as the tab being focused, not the close. */
+.close:focus-visible { outline: 0; }
+.close:focus-visible > span { outline: 1px solid var(--accent); outline-offset: 1px; }

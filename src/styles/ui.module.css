@@ -1,0 +1,90 @@
+/*
+ * The handful of things more than one component needs.
+ *
+ * Everything here is imported by name and `composes`d where a component wants
+ * to build on it, which is what keeps these from drifting into a second global
+ * stylesheet. If only one component ends up using a rule, it belongs in that
+ * component's own module instead.
+ */
+
+/* Every button on the files page. There was a filled `.fileBtn` beside these
+   for "Load recordings"; it is gone. The
+   accent fill made the file picker the loudest thing on a page whose whole
+   point is the list under it, and one filled button in a row of four reads as
+   the row's odd one out rather than as its first choice.
+
+   A flex box, because each of them is now a glyph and a word rather than a
+   word: the icon carries the button at a glance and the label settles which
+   one it is. */
+.ghost {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  cursor: pointer; background: var(--panel-2); color: var(--ink-dim);
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4); font: inherit; font-size: var(--text-control);
+  /* A flex box takes its height from its tallest item, so the one button that
+     is a glyph and no word came out five pixels shorter than the rest of the
+     row. This is the height a line of its own text would have given it --
+     `1.5em` is the inherited line-height, and the rest is this rule's own
+     padding and border, which count because everything here is border-box.
+     Written as the terms rather than their sum so it cannot drift from them. */
+  min-height: calc(1.5em + var(--space-2) * 2 + 2px);
+}
+.ghost:hover { color: var(--ink); border-color: var(--ink-faint); }
+.ghost:disabled { opacity: .55; cursor: default; }
+.ghost[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* A single glyph rather than a word, so it loses the horizontal padding. */
+.icon { padding: var(--space-2) var(--space-3); }
+
+/* Eats the space in a flex row, pushing what follows to the far end. */
+.spacer { flex: 1; }
+
+.hint { font-size: var(--text-control); color: var(--ink-faint); }
+
+/*
+ * The grid the scrubber and the sparklines share.
+ *
+ * It is what keeps a sparkline's x-axis locked to the slider's: one 8.5rem
+ * label column, then the plot. Change it and both move together, which is the
+ * whole point of it living in one place -- they used to be a comment asking
+ * you to remember.
+ */
+.labelled { display: grid; grid-template-columns: 8.5rem 1fr; column-gap: var(--space-5); }
+
+/*
+ * Difficulty, as a pill in the ramp's colour. Shared because two places say it
+ * -- the list, where it is a column you read down, and the meta bar over an
+ * open match -- and a row you picked out of the list by its colour has to be
+ * that same colour once it is open.
+ *
+ * The fill is set from the code rather than by a class per level: the ramp
+ * lives in one map in format.ts, and duplicating it as six CSS rules is how
+ * the two would drift. What is left here is everything the fill does not say.
+ * The default is the grey one -- a difficulty the ramp does not recognize,
+ * which is any localized recording.
+ */
+.diffPill {
+  display: inline-block; border-radius: var(--radius-sm); padding: var(--space-hair) var(--space-2);
+  font-size: var(--text-small); font-weight: 600; line-height: 1.45;
+  background: var(--panel-2); color: var(--ink-dim);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/*
+ * A time that moves the playhead.
+ *
+ * Every time drawn against an open match is a moment you can go to -- when a
+ * row's first order went in, when an age landed -- so each of them is a real
+ * `<button>`, for the Enter and Space and focus order and the role that come
+ * with one. This is what takes the browser's chrome back off without taking
+ * the focus ring with it.
+ *
+ * Shared because there are two of them and the ring has to be the same ring.
+ * `composes`d rather than copied, which also settles the order: the composing
+ * file is emitted after this one, so a site's own border and padding -- the
+ * age chip has both -- still win over the reset.
+ */
+.seek {
+  appearance: none; background: none; border: 0; padding: 0;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.seek:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }

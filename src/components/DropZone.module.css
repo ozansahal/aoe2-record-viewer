@@ -1,0 +1,15 @@
+/* ---- drop zone ---- */
+.empty {
+  border: 2px dashed var(--line); border-radius: var(--radius);
+  padding: 5rem var(--space-7); text-align: center; color: var(--ink-dim);
+}
+.empty.over { border-color: var(--accent); background: var(--panel-2); }
+.empty.busy { border-style: solid; border-color: var(--accent); }
+/* The shared hint, plus the room it needs under the line above it here. */
+.hint {
+  composes: hint from "../styles/ui.module.css";
+  margin-top: var(--space-2);
+}
+/* Parsing a recording takes a beat even on a worker; say so. */
+.status { margin-top: var(--space-4); font-size: var(--text-control); color: var(--ink-dim); }
+.status.err { color: var(--red); }

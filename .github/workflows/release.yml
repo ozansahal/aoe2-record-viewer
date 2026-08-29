@@ -1,0 +1,91 @@
+# Builds the Windows installer and the portable exe, and attaches them to a
+# GitHub Release.
+#
+# They are ~100 MB each, which is exactly why they are never part of the Pages
+# artifact: that has a 1 GB site limit and a soft 10 GB/month of bandwidth, and
+# a release has neither. The page just links to /releases/latest and lets
+# GitHub redirect, so nothing here has to tell the page what was built.
+#
+# Push a tag that matches the version in package.json:
+#
+#   npm version patch && git push --follow-tags
+#
+# The artifact names come from package.json's version, not from the tag, so a
+# tag that disagrees would publish `...-0.1.0-setup.exe` under `v0.2.0`. The
+# job checks that before it spends five minutes building.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # For re-running a tag whose build failed for a reason that was not the code.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The existing tag to build and publish
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        # Git Bash, for the globs below: PowerShell does not expand them when
+        # it hands arguments to a native command, so `release/*.exe` would
+        # reach gh as that literal string.
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # No ELECTRON_SKIP_BINARY_DOWNLOAD here, unlike the Pages build: this one
+      # packages the desktop app and needs the Electron binary itself.
+      - run: npm ci
+
+      - name: Check the tag against package.json
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag is $tag but package.json says $version, so the artifacts would be named for $version"
+            exit 1
+          fi
+
+      # 36 tests, none of which need a recording. The parser's real gate is a
+      # byte-for-byte diff against real files, which cannot run here.
+      - run: npm test
+
+      # `package` is build (typecheck, vite, esbuild the Electron entry) and
+      # then electron-builder. Publishing is this workflow's job, not its.
+      - run: npm run package -- --publish never
+
+      - name: Attach the build to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          cat > notes.md <<'NOTES'
+          **Windows, 64-bit.** `setup.exe` installs and registers `.aoe2record`
+          so a recording opens on double-click; `portable.exe` runs from where
+          it is and installs nothing.
+
+          The build is unsigned, so Windows SmartScreen warns the first time it
+          runs: **More info** and then **Run anyway**. Signing it needs a
+          certificate this project does not have.
+
+          Nothing in the app talks to the network. Recordings are parsed on
+          your own machine and what it remembers stays in the app's own store.
+          NOTES
+          gh release view "$tag" >/dev/null 2>&1 \
+            || gh release create "$tag" --title "$tag" --notes-file notes.md
+          gh release upload "$tag" release/*.exe --clobber
