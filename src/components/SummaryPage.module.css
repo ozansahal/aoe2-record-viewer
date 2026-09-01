@@ -2,22 +2,16 @@
    The same saved rows the recordings page lists, added up: one list of dates,
    each of which opens onto the maps and difficulties the games under it were.
 
-   The panel is built exactly as the files page's is -- a head that stays put,
-   and one thing under it that scrolls -- because they are the two permanent
-   tabs and switching between them should not move the furniture. */
-.summary {
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: var(--radius); overflow: hidden;
-  display: flex; flex-direction: column; min-height: 0;
-}
-.head {
-  display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap;
-  padding: var(--space-4) var(--space-4); border-bottom: 1px solid var(--line); background: var(--panel-2);
-}
-.head > strong, .head > button { flex: none; }
+   No outer card: the recordings page is one -- a titled bar over a scroller,
+   because a folder of a thousand rows needs to keep its head in place -- and
+   this page is not. It is a document: a card of figures, a list of dates, a
+   set of footnotes. Wrapping it in a second frame was one frame too many, and
+   the page scrolls on the pane already. */
+.summary { display: block; }
 
-/* Everything below the head, and the only thing that scrolls. */
-.body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4); }
+/* Was the inside of the card; now the plain flow of the page, with only the
+   space between the sections it holds. */
+.body { display: block; }
 
 /* ---- where you are now ----
    The period you are in, ahead of the list. Everything before it is a row
@@ -368,6 +362,23 @@
   font-size: var(--text-small); color: var(--ink-faint);
 }
 .foot { padding: var(--space-3) var(--space-1) 0; }
+
+/* Scenarios: an inline text button on the footnote line the count is on. The
+   page has no titled bar for it any more, and a filled button on a line of
+   dim text would read as an interruption of the sentence rather than as its
+   ending. Kept inside its underline when off and fills when pressed, so the
+   state reads at a glance. */
+.scenarios {
+  appearance: none; background: none; border: 0; padding: 0 var(--space-1);
+  font: inherit; font-size: inherit; color: var(--ink-dim);
+  cursor: pointer; border-radius: var(--radius-sm);
+  text-decoration: underline; text-underline-offset: 0.15em;
+}
+.scenarios:hover { color: var(--ink); }
+.scenarios[aria-pressed="true"] {
+  background: var(--accent); color: #fff; text-decoration: none;
+}
+.scenarios:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 .empty { padding: var(--space-7) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); color: var(--ink-dim); }
 
 /* ---- the welcome ----
