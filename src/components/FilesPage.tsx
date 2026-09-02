@@ -470,7 +470,6 @@ export function FilesPage({
   return (
     <section className={styles.library} aria-label="Recordings">
       <div className={styles.head}>
-        <strong>Recordings</strong>
         {state?.folder ? (
           <span className={styles.path} title={state.folder}>{state.folder}</span>
         ) : null}
