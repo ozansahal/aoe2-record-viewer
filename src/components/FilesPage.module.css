@@ -1,20 +1,26 @@
 /* ---- the files page ----
    Everything there is to open: the folder the game writes to and the parses
    kept in this browser, in one list. */
-/* The whole page, and the only thing in the pane when it is up -- so the gap
-   below it is the pane's own padding, not a margin of its own on top of it. */
+/* The whole page, and the only thing in the pane when it is up. No outer
+   card -- the tab is already what says this is the recordings page, and a
+   framed panel inside the pane was one frame too many. What is still here is
+   the layout: a column so the list can take whatever height the head and the
+   footers leave, with the list scrolling on its own so the head with the
+   filter box and buttons stays put. `flex: 1` explicitly because the parent's
+   flex column relied on the panel being the sole item; `min-height: 0` is
+   what lets the pane shrink it to the window, or the panel would grow past
+   the bottom instead of the list scrolling. */
 .library {
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: var(--radius); overflow: hidden;
-  /* A column so the list can take whatever height the head and the footers
-     leave. `min-height: 0` is what lets the pane shrink it to the window --
-     a flex item will not go below its content without it, and the panel would
-     grow past the bottom instead of the list scrolling. */
-  display: flex; flex-direction: column; min-height: 0;
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
 }
+/* A row of controls at the top of the page rather than the head of a card.
+   No fill and no border under it: the row it introduces has its own borders
+   above every item. Padding drops the horizontal since the pane already
+   provides it, leaving only the vertical breathing room. */
 .head {
   display: flex; align-items: center; gap: var(--space-3); flex-wrap: nowrap;
-  padding: var(--space-4) var(--space-4); border-bottom: 1px solid var(--line); background: var(--panel-2);
+  padding: 0 0 var(--space-3);
 }
 /* One row, always. The row used to wrap, which dropped "Load recordings" onto
    a line of its own and pushed the list down -- and it wrapped even though the
@@ -67,6 +73,19 @@
   border: 1px solid var(--line); border-radius: var(--radius-lg);
   background: var(--panel); color: var(--ink);
 }
+
+/* The frame round the list. A column, like .library, so the list inside can
+   take whatever the scan bar and the footers leave; `overflow: hidden` so the
+   rows and the sticky group heads clip to the rounded corners instead of
+   drawing square over them. */
+.frame, .bare {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.frame { border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+/* The last thing in the frame draws no line of its own -- the frame's border
+   is right under it. */
+.frame > :last-child { border-bottom: 0; }
 
 /* Whatever is left of the panel, and the only thing here that scrolls. It was
    capped at 46vh, which on a tall window stopped the list halfway down and put

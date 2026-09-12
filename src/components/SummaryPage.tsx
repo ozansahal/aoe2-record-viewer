@@ -475,24 +475,6 @@ export function SummaryPage({ saved, onRecordings, onOpen, openNames, busy }: Pr
 
   return (
     <section className={styles.summary} aria-label="Summary">
-      <div className={styles.head}>
-        <strong>Summary</strong>
-        <span className={ui.hint}>
-          {nothing ? "No games yet" : `${games.length} ${games.length === 1 ? "game" : "games"}`}
-        </span>
-        <span className={ui.spacer} />
-        {scenarios ? (
-          <button
-            className={ui.ghost}
-            aria-pressed={scenariosIncluded}
-            onClick={() => { setScenariosIncluded((was) => !was); reset(); }}
-            title="Campaign missions and challenges are left out by default: a dozen attempts at one mission would be most of the record."
-          >
-            Scenarios
-          </button>
-        ) : null}
-      </div>
-
       {nothing ? (
         <div className={styles.welcome}>
           <h3 className={styles.welcomeTitle}>See the whole game again</h3>
@@ -632,20 +614,36 @@ export function SummaryPage({ saved, onRecordings, onOpen, openNames, busy }: Pr
 
           {/* What is not in the numbers above. A summary that quietly drops
               rows is one you cannot trust, and both of these are dropped for a
-              reason worth stating. */}
-          {unknown || (scenarios && !scenariosIncluded) ? (
+              reason worth stating. The Scenarios toggle sits on this line
+              beside the count it decides: the page no longer has a titled bar
+              at the top for a control to live on. */}
+          {unknown || scenarios ? (
             <p className={styles.foot}>
               {unknown ? (
                 <>
                   {unknown === 1
-                    ? "One kept parse names no player as its owner and is not counted"
-                    : `${unknown} kept parses name no player as their owner and are not counted`}
-                  {" — there is nobody for a win to belong to."}{" "}
+                    ? "One kept parse names no player as its owner and is left out"
+                    : `${unknown} kept parses name no player as their owner and are left out`}
+                  {" — there is nobody for a win to belong to."}
+                  {scenarios ? " " : null}
                 </>
               ) : null}
-              {scenarios && !scenariosIncluded
-                ? `${scenarios} campaign and scenario ${scenarios === 1 ? "recording is" : "recordings are"} left out; Scenarios above folds them in.`
-                : null}
+              {scenarios ? (
+                <>
+                  {scenariosIncluded
+                    ? `Campaign and scenario recordings are included (${scenarios}).`
+                    : `${scenarios} campaign and scenario ${scenarios === 1 ? "recording is" : "recordings are"} left out.`}
+                  {" "}
+                  <button
+                    className={styles.scenarios}
+                    aria-pressed={scenariosIncluded}
+                    onClick={() => { setScenariosIncluded((was) => !was); reset(); }}
+                    title="Campaign missions and challenges are left out by default: a dozen attempts at one mission would be most of the record."
+                  >
+                    Scenarios
+                  </button>
+                </>
+              ) : null}
             </p>
           ) : null}
           {/* The one place on the page a game is counted twice, said out loud

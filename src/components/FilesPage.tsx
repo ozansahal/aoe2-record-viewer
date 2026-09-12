@@ -470,7 +470,6 @@ export function FilesPage({
   return (
     <section className={styles.library} aria-label="Recordings">
       <div className={styles.head}>
-        <strong>Recordings</strong>
         {state?.folder ? (
           <span className={styles.path} title={state.folder}>{state.folder}</span>
         ) : null}
@@ -533,6 +532,13 @@ export function FilesPage({
           {busy ? "Parsing..." : "Load recordings"}
         </button>
       </div>
+
+      {/* One framed box for everything under the head: the scan bar, the
+          list, and the footers, so the border and the corners go round the
+          whole of it rather than round the scrolling part alone. Not when the
+          drop zone is the whole page, though: it draws its own dashed border,
+          and a solid one a pixel outside it read as a mistake. */}
+      <div className={bare ? styles.bare : styles.frame}>
 
       {/* What the background scan is doing, and the way out of it. It is CPU
           nobody asked for, so it says so and can be stopped. */}
@@ -765,6 +771,7 @@ export function FilesPage({
           )}
         </div>
       ) : null}
+      </div>
     </section>
   );
 }
