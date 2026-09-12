@@ -74,6 +74,19 @@
   background: var(--panel); color: var(--ink);
 }
 
+/* The frame round the list. A column, like .library, so the list inside can
+   take whatever the scan bar and the footers leave; `overflow: hidden` so the
+   rows and the sticky group heads clip to the rounded corners instead of
+   drawing square over them. */
+.frame, .bare {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+}
+.frame { border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+/* The last thing in the frame draws no line of its own -- the frame's border
+   is right under it. */
+.frame > :last-child { border-bottom: 0; }
+
 /* Whatever is left of the panel, and the only thing here that scrolls. It was
    capped at 46vh, which on a tall window stopped the list halfway down and put
    a band of empty background under the panel; the footers below it stay put
