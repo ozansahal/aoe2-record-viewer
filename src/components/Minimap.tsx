@@ -4,9 +4,11 @@ import { playerColor } from "../lib/format";
 import {
   KIND, OVERLAY, buildingsAt, decodeLayer, projectTile, unprojectPoint,
 } from "../lib/minimap";
+import { byTeam } from "../lib/teams";
 import { DECAY_SECS } from "../lib/view";
+import { OrderFeed } from "./OrderFeed";
 import type {
-  MapMark, Minimap as MinimapData, MinimapAttacks, Mode, Payload,
+  MapMark, Minimap as MinimapData, MinimapAttacks, Mode, Payload, Player,
 } from "../types";
 import styles from "./Minimap.module.css";
 
@@ -577,6 +579,11 @@ export interface View {
   u: number;
   v: number;
 }
+
+/** The row's class per size; see `.row` in the stylesheet. */
+const ROW: Record<Size, string> = {
+  compact: styles.rowCompact, large: styles.rowLarge, wide: styles.rowWide,
+};
 
 const HOME: View = { zoom: 1, u: 0.5, v: 0.5 };
 const MAX_ZOOM = 8;
@@ -1202,309 +1209,339 @@ export function Minimap({
      not there. */
   if (!data) return null;
 
+  /* The order feed's two columns, one per margin. Teams alternate sides, so
+     a 1v1 or a 2v2 has each side's players beside each other and facing the
+     other's -- the shape the game itself has. An FFA alternates players. */
+  const sides = useMemo(() => {
+    const left: Player[] = [];
+    const right: Player[] = [];
+    byTeam(payload.players).forEach((team, i) => (i % 2 ? right : left).push(...team));
+    return { left, right };
+  }, [payload.players]);
+  /* Fewer rows each when a margin holds several players, or the column runs
+     past the bottom of the map it is beside. */
+  const feedRows = Math.max(sides.left.length, sides.right.length) > 2 ? 4 : 8;
+
   return (
-    <section
-      /* One class per size past the default. `large` is the default and adds
-         nothing: it is the cap the panel already carries. */
-      className={
-        size === "large" ? styles.minimap : `${styles.minimap} ${styles[size]}`
-      }
-    >
-      <div className={styles.label}>
-        <button
-          type="button"
-          className={styles.title}
-          onClick={() => setOpen((was) => !was)}
-          aria-expanded={open}
-        >
-          <span className={open ? styles.caretOpen : styles.caret} aria-hidden="true">▸</span>
-          Map
-        </button>
-        {/* Beside the heading rather than in the stack over the plot: it sizes
-            the panel, so it is not one of the map's own controls -- and at
-            compact width the stack is already the busiest corner of the map.
-            Hidden while folded, where there is no plot to size. */}
+    /* The panel and its margins. A grid rather than the panel's own auto
+       margins, so the space either side of the capped panel is a column
+       something can be put in -- the order feed -- and so that when there is
+       no such space, at wide or in a narrow window, the same two columns go
+       under the map instead. The cap moves up here with it: the middle track
+       is what holds the panel to `--map-max`, and the panel's own max-width
+       now only repeats what the track already says. */
+    <div className={styles.box}>
+      <div className={`${styles.row} ${ROW[size]}${open ? "" : ` ${styles.folded}`}`}>
         {open ? (
-          <div className={styles.sizes} role="group" aria-label="Map size">
-            <button
-              type="button"
-              aria-pressed={size === "compact"}
-              onClick={() => setSize("compact")}
-            >
-              Compact
-            </button>
-            <button
-              type="button"
-              aria-pressed={size === "large"}
-              onClick={() => setSize("large")}
-            >
-              Large
-            </button>
-            {/* No cap at all -- the map takes the page. Its own button rather
-                than a bigger `large`, because the cap exists for a reason
-                (past it the 2048 backing store is being stretched rather than
-                sampled down, and a 2:1 map the width of the window is tall
-                enough to push the cards off the fold) and this is the choice
-                to spend both of those. */}
-            <button
-              type="button"
-              aria-pressed={size === "wide"}
-              onClick={() => setSize("wide")}
-              title="Full width — the map is stretched past the backing store's own resolution"
-            >
-              Wide
-            </button>
-          </div>
+          <OrderFeed payload={payload} players={sides.left} t={at} rows={feedRows} side="left" />
         ) : null}
-        {/* Beside the size for the same reason: both are about the panel the
-            map is in rather than about the match. One button, not a pair --
-            the diamond is the default and this is the departure from it. */}
-        {open ? (
-          <button
-            type="button"
-            className={styles.shape}
-            onClick={() => setSquare((was) => !was)}
-            aria-pressed={square}
-            title="Draw the map unsquashed, in a square plot"
-          >
-            Square
-          </button>
-        ) : null}
-      </div>
-      {open ? (
-      <div className={styles.plot}>
-        <div className={styles.stage}>
-        <canvas
-          ref={canvas}
-          width={PLOT.w}
-          height={PLOT.h}
-          className={view.zoom > 1 ? `${styles.canvas} ${styles.grab}` : styles.canvas}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-          onDoubleClick={() => setView(HOME)}
-          role="img"
-          aria-label={
-            `${payload.map}, ${data.dim} by ${data.dim} tiles: resources, and the `
-            + "buildings each player had ordered by the playhead, in their colour"
-          }
-        />
-        {/* One corner, and it wraps. Everything over the plot is a control now
-            that the building count is gone, so splitting them across the two
-            top corners was separating things that are read together -- and the
-            readouts that used to hold the left corner are two chips, which is
-            not a column. The wrap is what keeps a single cluster out of the
-            map: chips flow right to left and down, widest rows first, which is
-            the shape of the room a top corner has -- see `tools` in the
-            stylesheet. Ordered so the layer's own controls come before what
-            the map is and where you are in it. */}
-        <div className={styles.tools}>
-        {data.attacks?.t.length ? (
-          <button
-            type="button"
-            className={military ? `${styles.toggle} ${styles.on}` : styles.toggle}
-            onClick={() => setMilitary((was) => !was)}
-            aria-pressed={military}
-          >
-            Military
-          </button>
-        ) : null}
-        {onMode ? (
-          /* Narrowest reach first, widest last: decay, then the flat window
-             behind it, then the whole game. The order is the amount of the
-             match each one is claiming to describe, and the default sits at
-             the end you start reading from. */
-          <div className={styles.modes}>
-            <button
-              type="button"
-              aria-pressed={mode === "decay"}
-              onClick={() => onMode("decay")}
-            >
-              Decay
-            </button>
-            <button
-              type="button"
-              aria-pressed={mode === "window"}
-              onClick={() => onMode("window")}
-            >
-              Window
-            </button>
-            <button
-              type="button"
-              aria-pressed={mode === "cumulative"}
-              onClick={() => onMode("cumulative")}
-            >
-              All
-            </button>
-          </div>
-        ) : null}
-        {/* ---- the three numbers ----
-            Every one of these is showing in every mode, and two of them are
-            usually inert. That is deliberate, and it is the whole of the fix
-            for a cluster that used to move under the cursor.
-
-            The chips wrap, so removing one does not just leave a gap where it
-            was: the ones after it slide up into its place and the rows
-            re-pack, which took the mode buttons themselves with them. Switch
-            from Decay to All and the pair of numbers vanished, the cluster
-            shortened by a row, and the button you had just pressed was
-            somewhere else -- with the pointer now over whatever had moved into
-            the space. A control that jumps out from under the click that
-            worked it is worse than one that is visibly not applicable.
-
-            So the geometry is fixed: same chips, same order, same rows, in all
-            three modes. A number the mode does not read is dimmed and its
-            field disabled, which also answers the question the disappearance
-            never did -- that the control exists and this mode has no use for
-            it. See `.muted` in the stylesheet. */}
-        {/* Both windowed modes read this one -- it is how far back they reach,
-            and in decay's case also how long the fade takes. Cumulative counts
-            the whole match, so there is no window for it to size. */}
-        {onW ? (
-          <label
-            className={mode === "cumulative" ? `${styles.secs} ${styles.muted}` : styles.secs}
-            title={
-              mode === "cumulative"
-                ? "How far back the fighting layer reaches. All counts the whole match, "
-                  + "so this applies in Decay and Window only"
-                : "How far back the fighting layer reaches"
-            }
-          >
-            last{" "}
-            <input
-              type="number"
-              value={w}
-              min={5}
-              max={600}
-              step={5}
-              disabled={mode === "cumulative"}
-              onChange={(event) => onW(Number(event.target.value))}
-            />{" "}
-            sec
-          </label>
-        ) : null}
-        {/* Decay's alone: in the other two an order's age buys it nothing, so
-            a fade sharpness is a control over nothing. */}
-        <label
-          className={mode === "decay" ? styles.secs : `${styles.secs} ${styles.muted}`}
-          title={
-            "How sharply fighting fades across the window: higher leaves only "
-            + "the last few seconds bright, lower keeps a longer trail behind it"
-            + (mode === "decay" ? "" : ". Decay mode only -- the other two weigh every order alike")
+        <section
+          /* One class per size past the default. `large` is the default and adds
+             nothing: it is the cap the panel already carries. */
+          className={
+            size === "large" ? styles.minimap : `${styles.minimap} ${styles[size]}`
           }
         >
-          decay{" "}
-          <input
-            type="number"
-            value={decaySpan}
-            min={0.4}
-            max={6}
-            step={0.2}
-            disabled={mode !== "decay"}
-            /* Clamped where the field is read rather than left to the
-               attributes, which browsers treat as advice: the weight is
-               rescaled by `1 - e^-span`, so a cleared field arriving as 0
-               would divide by zero and paint the layer NaN. */
-            onChange={(event) => setDecaySpan(clamp(Number(event.target.value), 0.4, 6))}
-          />
-        </label>
-        {/* Only if there is a layer to draw at all -- that is a fact about the
-            recording and does not change while you are looking at it. Whether
-            the layer is *on* does change, and turning it off dims this rather
-            than removing it, for the same reason the two above stay: the chip
-            is directly under the toggle that governs it, and a cluster that
-            re-packs on every press moves the toggle out from under the
-            pointer. */}
-        {data.attacks?.t.length ? (
-          <label
-            className={military ? styles.secs : `${styles.secs} ${styles.muted}`}
-            title={
-              "How much brightness a given volume of attack orders is worth: "
-              + "higher makes the fighting layer stronger over the same orders"
-              + (military ? "" : ". The military layer is off")
-            }
-          >
-            military{" "}
-            <input
-              type="number"
-              value={heatStrength}
-              min={0.25}
-              max={4}
-              step={0.25}
-              disabled={!military}
-              onChange={(event) => setHeatStrength(clamp(Number(event.target.value), 0.25, 4))}
+          <div className={styles.label}>
+            <button
+              type="button"
+              className={styles.title}
+              onClick={() => setOpen((was) => !was)}
+              aria-expanded={open}
+            >
+              <span className={open ? styles.caretOpen : styles.caret} aria-hidden="true">▸</span>
+              Map
+            </button>
+            {/* Beside the heading rather than in the stack over the plot: it sizes
+                the panel, so it is not one of the map's own controls -- and at
+                compact width the stack is already the busiest corner of the map.
+                Hidden while folded, where there is no plot to size. */}
+            {open ? (
+              <div className={styles.sizes} role="group" aria-label="Map size">
+                <button
+                  type="button"
+                  aria-pressed={size === "compact"}
+                  onClick={() => setSize("compact")}
+                >
+                  Compact
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={size === "large"}
+                  onClick={() => setSize("large")}
+                >
+                  Large
+                </button>
+                {/* No cap at all -- the map takes the page. Its own button rather
+                    than a bigger `large`, because the cap exists for a reason
+                    (past it the 2048 backing store is being stretched rather than
+                    sampled down, and a 2:1 map the width of the window is tall
+                    enough to push the cards off the fold) and this is the choice
+                    to spend both of those. */}
+                <button
+                  type="button"
+                  aria-pressed={size === "wide"}
+                  onClick={() => setSize("wide")}
+                  title="Full width — the map is stretched past the backing store's own resolution"
+                >
+                  Wide
+                </button>
+              </div>
+            ) : null}
+            {/* Beside the size for the same reason: both are about the panel the
+                map is in rather than about the match. One button, not a pair --
+                the diamond is the default and this is the departure from it. */}
+            {open ? (
+              <button
+                type="button"
+                className={styles.shape}
+                onClick={() => setSquare((was) => !was)}
+                aria-pressed={square}
+                title="Draw the map unsquashed, in a square plot"
+              >
+                Square
+              </button>
+            ) : null}
+          </div>
+          {open ? (
+          <div className={styles.plot}>
+            <div className={styles.stage}>
+            <canvas
+              ref={canvas}
+              width={PLOT.w}
+              height={PLOT.h}
+              className={view.zoom > 1 ? `${styles.canvas} ${styles.grab}` : styles.canvas}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              onDoubleClick={() => setView(HOME)}
+              role="img"
+              aria-label={
+                `${payload.map}, ${data.dim} by ${data.dim} tiles: resources, and the `
+                + "buildings each player had ordered by the playhead, in their colour"
+              }
             />
-            ×
-          </label>
-        ) : null}
-        {/* What the map is, after what is drawn on it: the size is a fact you
-            check once and the zoom is where you already know you are. */}
-        <span className={styles.sub}>{data.dim} × {data.dim}</span>
-        {view.zoom > 1 ? (
-          <button type="button" className={styles.reset} onClick={() => setView(HOME)}>
-            {view.zoom.toFixed(1)}× · reset
-          </button>
-        ) : (
-          <span className={styles.hint}>scroll to zoom</span>
-        )}
-        </div>
-        {/* Two lists, not one: what the terrain colours mean, then who the
-            player colours are. Flat and concatenated they read as one
-            vocabulary, and a player called "Forest" or "Gold" disappeared
-            into it. See the `legend` block in the stylesheet.
+            {/* One corner, and it wraps. Everything over the plot is a control now
+                that the building count is gone, so splitting them across the two
+                top corners was separating things that are read together -- and the
+                readouts that used to hold the left corner are two chips, which is
+                not a column. The wrap is what keeps a single cluster out of the
+                map: chips flow right to left and down, widest rows first, which is
+                the shape of the room a top corner has -- see `tools` in the
+                stylesheet. Ordered so the layer's own controls come before what
+                the map is and where you are in it. */}
+            <div className={styles.tools}>
+            {data.attacks?.t.length ? (
+              <button
+                type="button"
+                className={military ? `${styles.toggle} ${styles.on}` : styles.toggle}
+                onClick={() => setMilitary((was) => !was)}
+                aria-pressed={military}
+              >
+                Military
+              </button>
+            ) : null}
+            {onMode ? (
+              /* Narrowest reach first, widest last: decay, then the flat window
+                 behind it, then the whole game. The order is the amount of the
+                 match each one is claiming to describe, and the default sits at
+                 the end you start reading from. */
+              <div className={styles.modes}>
+                <button
+                  type="button"
+                  aria-pressed={mode === "decay"}
+                  onClick={() => onMode("decay")}
+                >
+                  Decay
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={mode === "window"}
+                  onClick={() => onMode("window")}
+                >
+                  Window
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={mode === "cumulative"}
+                  onClick={() => onMode("cumulative")}
+                >
+                  All
+                </button>
+              </div>
+            ) : null}
+            {/* ---- the three numbers ----
+                Every one of these is showing in every mode, and two of them are
+                usually inert. That is deliberate, and it is the whole of the fix
+                for a cluster that used to move under the cursor.
 
-            Over the plot rather than under it, and in a column, for the same
-            reason the tools are: the map is what you are looking at, and a
-            key you have to look away from the map to read is a key you read
-            twice. Down the left, because the tools hold the right -- and the
-            players go above the terrain, since a name is what you look up
-            while the vocabulary is what you learn once. */}
-        <div className={styles.floats}>
-          <ul
-            className={`${styles.legend} ${styles.legendPlayers}`}
-            aria-label="Player colours"
-          >
-            {payload.players.map((p) => (
-              <li key={p.number}>
-                <span className={styles.swatch} style={{ background: playerColor(p) }} />
-                {p.name || `Player ${p.number}`}
-              </li>
-            ))}
-          </ul>
-          {/* Folded away rather than dropped: seven swatches are worth one
-              reading and then only worth the room they take. The same
-              disclosure the panel itself uses, so there is one kind of fold
-              on this map and not two. Collapsed it is still a chip that says
-              what it is, which is what makes it findable again. */}
-          <div className={styles.legendBox}>
-            <button
-              type="button"
-              className={styles.legendTitle}
-              onClick={() => setKey((was) => !was)}
-              aria-expanded={showKey}
+                The chips wrap, so removing one does not just leave a gap where it
+                was: the ones after it slide up into its place and the rows
+                re-pack, which took the mode buttons themselves with them. Switch
+                from Decay to All and the pair of numbers vanished, the cluster
+                shortened by a row, and the button you had just pressed was
+                somewhere else -- with the pointer now over whatever had moved into
+                the space. A control that jumps out from under the click that
+                worked it is worse than one that is visibly not applicable.
+
+                So the geometry is fixed: same chips, same order, same rows, in all
+                three modes. A number the mode does not read is dimmed and its
+                field disabled, which also answers the question the disappearance
+                never did -- that the control exists and this mode has no use for
+                it. See `.muted` in the stylesheet. */}
+            {/* Both windowed modes read this one -- it is how far back they reach,
+                and in decay's case also how long the fade takes. Cumulative counts
+                the whole match, so there is no window for it to size. */}
+            {onW ? (
+              <label
+                className={mode === "cumulative" ? `${styles.secs} ${styles.muted}` : styles.secs}
+                title={
+                  mode === "cumulative"
+                    ? "How far back the fighting layer reaches. All counts the whole match, "
+                      + "so this applies in Decay and Window only"
+                    : "How far back the fighting layer reaches"
+                }
+              >
+                last{" "}
+                <input
+                  type="number"
+                  value={w}
+                  min={5}
+                  max={600}
+                  step={5}
+                  disabled={mode === "cumulative"}
+                  onChange={(event) => onW(Number(event.target.value))}
+                />{" "}
+                sec
+              </label>
+            ) : null}
+            {/* Decay's alone: in the other two an order's age buys it nothing, so
+                a fade sharpness is a control over nothing. */}
+            <label
+              className={mode === "decay" ? styles.secs : `${styles.secs} ${styles.muted}`}
+              title={
+                "How sharply fighting fades across the window: higher leaves only "
+                + "the last few seconds bright, lower keeps a longer trail behind it"
+                + (mode === "decay" ? "" : ". Decay mode only -- the other two weigh every order alike")
+              }
             >
-              <span className={showKey ? styles.caretOpen : styles.caret} aria-hidden="true">▸</span>
-              Key
-            </button>
-            {showKey ? (
-              <ul className={styles.legend} aria-label="Terrain and resource colours">
-                {LEGEND.map((item) => (
-                  <li key={item.code}>
-                    <span
-                      className={styles.swatch}
-                      style={{ background: OVERLAY_COLOR[item.code] }}
-                    />
-                    {item.label}
+              decay{" "}
+              <input
+                type="number"
+                value={decaySpan}
+                min={0.4}
+                max={6}
+                step={0.2}
+                disabled={mode !== "decay"}
+                /* Clamped where the field is read rather than left to the
+                   attributes, which browsers treat as advice: the weight is
+                   rescaled by `1 - e^-span`, so a cleared field arriving as 0
+                   would divide by zero and paint the layer NaN. */
+                onChange={(event) => setDecaySpan(clamp(Number(event.target.value), 0.4, 6))}
+              />
+            </label>
+            {/* Only if there is a layer to draw at all -- that is a fact about the
+                recording and does not change while you are looking at it. Whether
+                the layer is *on* does change, and turning it off dims this rather
+                than removing it, for the same reason the two above stay: the chip
+                is directly under the toggle that governs it, and a cluster that
+                re-packs on every press moves the toggle out from under the
+                pointer. */}
+            {data.attacks?.t.length ? (
+              <label
+                className={military ? styles.secs : `${styles.secs} ${styles.muted}`}
+                title={
+                  "How much brightness a given volume of attack orders is worth: "
+                  + "higher makes the fighting layer stronger over the same orders"
+                  + (military ? "" : ". The military layer is off")
+                }
+              >
+                military{" "}
+                <input
+                  type="number"
+                  value={heatStrength}
+                  min={0.25}
+                  max={4}
+                  step={0.25}
+                  disabled={!military}
+                  onChange={(event) => setHeatStrength(clamp(Number(event.target.value), 0.25, 4))}
+                />
+                ×
+              </label>
+            ) : null}
+            {/* What the map is, after what is drawn on it: the size is a fact you
+                check once and the zoom is where you already know you are. */}
+            <span className={styles.sub}>{data.dim} × {data.dim}</span>
+            {view.zoom > 1 ? (
+              <button type="button" className={styles.reset} onClick={() => setView(HOME)}>
+                {view.zoom.toFixed(1)}× · reset
+              </button>
+            ) : (
+              <span className={styles.hint}>scroll to zoom</span>
+            )}
+            </div>
+            {/* Two lists, not one: what the terrain colours mean, then who the
+                player colours are. Flat and concatenated they read as one
+                vocabulary, and a player called "Forest" or "Gold" disappeared
+                into it. See the `legend` block in the stylesheet.
+
+                Over the plot rather than under it, and in a column, for the same
+                reason the tools are: the map is what you are looking at, and a
+                key you have to look away from the map to read is a key you read
+                twice. Down the left, because the tools hold the right -- and the
+                players go above the terrain, since a name is what you look up
+                while the vocabulary is what you learn once. */}
+            <div className={styles.floats}>
+              <ul
+                className={`${styles.legend} ${styles.legendPlayers}`}
+                aria-label="Player colours"
+              >
+                {payload.players.map((p) => (
+                  <li key={p.number}>
+                    <span className={styles.swatch} style={{ background: playerColor(p) }} />
+                    {p.name || `Player ${p.number}`}
                   </li>
                 ))}
               </ul>
-            ) : null}
+              {/* Folded away rather than dropped: seven swatches are worth one
+                  reading and then only worth the room they take. The same
+                  disclosure the panel itself uses, so there is one kind of fold
+                  on this map and not two. Collapsed it is still a chip that says
+                  what it is, which is what makes it findable again. */}
+              <div className={styles.legendBox}>
+                <button
+                  type="button"
+                  className={styles.legendTitle}
+                  onClick={() => setKey((was) => !was)}
+                  aria-expanded={showKey}
+                >
+                  <span className={showKey ? styles.caretOpen : styles.caret} aria-hidden="true">▸</span>
+                  Key
+                </button>
+                {showKey ? (
+                  <ul className={styles.legend} aria-label="Terrain and resource colours">
+                    {LEGEND.map((item) => (
+                      <li key={item.code}>
+                        <span
+                          className={styles.swatch}
+                          style={{ background: OVERLAY_COLOR[item.code] }}
+                        />
+                        {item.label}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+            </div>
           </div>
-        </div>
-        </div>
+          ) : null}
+        </section>
+        {open ? (
+          <OrderFeed payload={payload} players={sides.right} t={at} rows={feedRows} side="right" />
+        ) : null}
       </div>
-      ) : null}
-    </section>
+    </div>
   );
 }

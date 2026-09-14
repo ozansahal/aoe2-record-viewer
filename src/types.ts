@@ -161,6 +161,12 @@ export interface MinimapAttacks {
   player: Uint8Array;
   x: Uint16Array;
   y: Uint16Array;
+  /**
+   * How many units each order was given to -- the size of the selection, with
+   * the AI's one-unit orders summed into the collapsed order they belong to.
+   * Optional: a payload parsed before this existed has no count to show.
+   */
+  n?: Uint16Array;
 }
 
 export interface MinimapStart {
@@ -217,6 +223,21 @@ export interface MapMark {
   color: string;
   /** Radius in tiles. Default 1. */
   r?: number;
+}
+
+/** A row in the order feed beside the map. See lib/orders.ts. */
+export type OrderKind = "build" | "tech" | "unit" | "delete" | "attack";
+
+export interface Order {
+  /** Stable for the life of the payload; the rendered row's key. */
+  id: number;
+  t: number;
+  player: number;
+  kind: OrderKind;
+  /** What was ordered: an item name, or "Attack". */
+  label: string;
+  /** Units, for a unit or attack order; 1 otherwise. 0 when unknown. */
+  qty: number;
 }
 
 export interface Payload {

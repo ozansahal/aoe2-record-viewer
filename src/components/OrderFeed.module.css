@@ -1,0 +1,67 @@
+/* ---- the order feed ----
+   A ticker per player in the margin beside the map, or in a row under it when
+   there is no margin to put it in. The panel above is the picture; this is the
+   caption that keeps changing under it. Small type throughout: it is read in
+   the corner of the eye while the map is what is being watched. */
+.feed {
+  display: flex; flex-direction: var(--feed-dir, column); flex-wrap: wrap; gap: var(--space-4) var(--space-6);
+  min-width: 0;
+  font-size: var(--text-small); font-variant-numeric: tabular-nums;
+}
+/* Down a margin the block is the column's width; along a line under the map
+   each takes a share, and they wrap when there are more than fit. */
+.player { min-width: 0; flex: var(--feed-item, none); max-width: 100%; }
+
+.name {
+  margin: 0 0 var(--space-1); font-size: var(--text-small); font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The list clips what slides in from above it, so a new row grows out of the
+   heading rather than dropping in from the panel over it. */
+.rows { list-style: none; margin: 0; padding: 0; overflow: hidden; }
+.row {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  padding: var(--space-hair) 0; min-width: 0;
+  color: var(--ink-dim);
+  animation: slide .28s ease-out;
+}
+@keyframes slide {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .row { animation: none; } }
+/* Newest first, and the older rows fade a step at a time: the top of the block
+   is what just happened, the bottom is context. */
+.row:nth-child(n+4) { opacity: .8; }
+.row:nth-child(n+6) { opacity: .6; }
+.row:nth-child(n+8) { opacity: .45; }
+.when { flex: none; color: var(--ink-faint); font-size: var(--text-caption); }
+.label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qty { flex: none; color: var(--ink-faint); }
+/* The kind, in the category colours the cards already use, on the label. */
+.build .label { color: var(--build); }
+.tech .label { color: var(--tech); }
+.unit .label { color: var(--unit); }
+.attack .label { color: var(--red); font-weight: 600; }
+/* Taken off the map, so taken off the line. */
+.delete .label { text-decoration: line-through; color: var(--ink-faint); }
+.none { color: var(--ink-faint); font-style: italic; animation: none; }
+
+/* Down a margin the column hugs the map rather than the page edge -- a caption
+   beside the picture, not a sidebar -- so the left one is set against its
+   track's right edge with its text right-aligned and the row read from the map
+   outwards, label first, time last. The right column reads the ordinary way
+   and sits against its left edge. */
+.left { justify-self: end; max-width: 100%; }
+.right { justify-self: start; max-width: 100%; }
+.left .name, .left .row { text-align: right; }
+.left .row { flex-direction: row-reverse; }
+/* Under the map there is no edge to hug and the two columns read as one line:
+   both take their track and run left to right, the right-hand one's players
+   pushed to the far end so the two sides mirror about the middle. */
+@container style(--feed-dir: row) {
+  .left, .right { justify-self: stretch; }
+  .left .name, .left .row { text-align: left; }
+  .left .row { flex-direction: row; }
+  .right { justify-content: flex-end; }
+}

@@ -307,11 +307,12 @@ function militaryOrders(match: any, dim: number): MinimapAttacks {
     }
   }
 
-  const seen = new Set<string>();
+  const seen = new Map<string, number>();
   const t: number[] = [];
   const player: number[] = [];
   const xs: number[] = [];
   const ys: number[] = [];
+  const n: number[] = [];
   for (const input of inputs) {
     const number = input.player?.number;
     if (number === undefined || !input.position) continue;
@@ -339,18 +340,29 @@ function militaryOrders(match: any, dim: number): MinimapAttacks {
      * and brings the AIs to 1,681 and 1,126. Same events, comparable weight.
      */
     const key = `${number}|${x}|${y}|${second}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    /* How many units the order moved: the selection it was given to. Summed
+       into the collapsed order rather than kept from the first, so the AI's
+       forty single-unit orders and the human's one forty-unit order both come
+       out as forty -- the same reasoning as the collapse itself. */
+    const units = Math.min(65535, input.payload?.object_ids?.length ?? 0);
+    const had = seen.get(key);
+    if (had !== undefined) {
+      n[had] = Math.min(65535, n[had]! + units);
+      continue;
+    }
+    seen.set(key, t.length);
     t.push(second);
     player.push(number);
     xs.push(x);
     ys.push(y);
+    n.push(units);
   }
   return {
     t: Uint16Array.from(t),
     player: Uint8Array.from(player),
     x: Uint16Array.from(xs),
     y: Uint16Array.from(ys),
+    n: Uint16Array.from(n),
   };
 }
 
