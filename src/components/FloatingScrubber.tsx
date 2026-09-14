@@ -9,13 +9,13 @@ import styles from "./FloatingScrubber.module.css";
 /** A tap steps this far; shift jumps a minute. */
 const HUD_STEP = 10;
 
-/* The wheel over the clock is deliberately coarser than the track's 5s / 60s.
-   The track is the continuous control and a notch on it is a nudge; a notch
-   here is meant to cover ground, which is what you reach for the clock for.
-   Half a minute, and five with shift, which puts either end of a match a
-   comfortable flick away. */
-const WHEEL_STEP = 30;
-const WHEEL_STEP_SHIFT = 300;
+/* The wheel over the clock steps the same 5s / 60s the track does. It was
+   coarser -- half a minute, five with shift -- on the reasoning that the clock
+   is what you reach for to cover ground; in use the two gestures sit an inch
+   apart and a notch that means six times more on one than the other is a
+   surprise every time. One step, wherever the wheel lands on the pill. */
+const WHEEL_STEP = 5;
+const WHEEL_STEP_SHIFT = 60;
 
 /*
  * Jump to an end of the match.
