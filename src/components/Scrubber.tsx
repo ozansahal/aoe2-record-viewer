@@ -3,6 +3,7 @@ import { useMemo, useRef } from "react";
 import { FloatingScrubber } from "./FloatingScrubber";
 import { useNativeWheel } from "./useNativeWheel";
 import { fmt, playerColor } from "../lib/format";
+import { byTeam } from "../lib/teams";
 import type { Payload } from "../types";
 import styles from "./Scrubber.module.css";
 
@@ -54,12 +55,17 @@ export function Scrubber({
   const ticks = useMemo<Tick[]>(() => {
     if (!payload.duration) return [];
     const byPlayer = new Map(payload.players.map((p) => [p.number, p]));
+    // Players reach the same age seconds apart, so one shared row would
+    // collide. Split by *team* across the track -- first team above, second
+    // below, alternating beyond that -- so a 2v2 reads as two sides racing
+    // rather than four marks in two colours each. In a 1v1 or an FFA every
+    // player is their own team and this is the old split by player. The same
+    // rule the order feed uses to pick a side of the map.
+    const seatOf = new Map<number, number>();
+    byTeam(payload.players).forEach((team, i) => team.forEach((p) => seatOf.set(p.number, i % 2)));
     return (payload.ages || []).map((a, i) => {
       const p = byPlayer.get(a.player);
-      // Players reach the same age seconds apart, so one shared row would
-      // collide. Split by player across the track: first above, second below,
-      // alternating beyond that.
-      const seat = Math.max(0, payload.players.findIndex((x) => x.number === a.player)) % 2;
+      const seat = seatOf.get(a.player) ?? 0;
       return {
         key: `${a.player}-${a.age}-${a.t}-${i}`,
         fraction: a.t / payload.duration,
