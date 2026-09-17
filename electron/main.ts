@@ -16,11 +16,12 @@ import {
 } from "electron";
 
 import {
+  addFolder,
   listRecordings,
   PAYLOAD_EXTS,
   RECORDING_EXTS,
+  removeFolder,
   resolveEntry,
-  setFolder,
 } from "./library";
 import { applyZoom, currentZoom, DEFAULT_ZOOM, loadZoom, setZoom, stepZoom } from "./zoom";
 
@@ -324,28 +325,34 @@ if (!app.requestSingleInstanceLock()) {
       return readRecording(file);
     });
 
-    /* The recordings folder. The renderer never sees or sends a path outside
-       it -- it asks for an entry by the id `listRecordings` gave it. */
+    /* The recordings folders. The renderer never sees or sends a path outside
+       them -- it asks for an entry by the folder and id `listRecordings` gave
+       it, and the only path it names outright is one to take off the list. */
     ipcMain.handle("aoe2:library-list", () => listRecordings());
 
-    ipcMain.handle("aoe2:library-choose", async () => {
+    ipcMain.handle("aoe2:library-add", async () => {
       const result = await dialog.showOpenDialog({
-        title: "Choose your recordings folder",
+        title: "Add a recordings folder",
         properties: ["openDirectory"],
-        buttonLabel: "Use this folder",
+        buttonLabel: "Add this folder",
       });
       if (result.canceled || !result.filePaths[0]) return null;
-      return setFolder(result.filePaths[0]);
+      return addFolder(result.filePaths[0]);
     });
 
-    ipcMain.handle("aoe2:library-open", async (_event, id: unknown) => {
-      const file = typeof id === "string" ? await resolveEntry(id) : null;
-      if (!file) throw new Error("that recording is not in the chosen folder");
+    ipcMain.handle("aoe2:library-remove", async (_event, dir: unknown) => {
+      if (typeof dir !== "string") throw new Error("the folder must be a path");
+      return removeFolder(dir); // a path not on the list is a no-op there
+    });
+
+    ipcMain.handle("aoe2:library-open", async (_event, root: unknown, id: unknown) => {
+      const file = await resolveEntry(root, id);
+      if (!file) throw new Error("that recording is not in a listed folder");
       return readRecording(file);
     });
 
-    ipcMain.handle("aoe2:library-reveal", async (_event, id: unknown) => {
-      const file = typeof id === "string" ? await resolveEntry(id) : null;
+    ipcMain.handle("aoe2:library-reveal", async (_event, root: unknown, id: unknown) => {
+      const file = await resolveEntry(root, id);
       if (file) shell.showItemInFolder(file);
     });
 
@@ -354,9 +361,9 @@ if (!app.requestSingleInstanceLock()) {
        through the same `resolveEntry` check as everything else -- a renderer
        cannot name a file outside the chosen folder, and asking to delete one
        is where that matters most. */
-    ipcMain.handle("aoe2:library-trash", async (_event, id: unknown) => {
-      const file = typeof id === "string" ? await resolveEntry(id) : null;
-      if (!file) throw new Error("that recording is not in the chosen folder");
+    ipcMain.handle("aoe2:library-trash", async (_event, root: unknown, id: unknown) => {
+      const file = await resolveEntry(root, id);
+      if (!file) throw new Error("that recording is not in a listed folder");
       await shell.trashItem(file);
     });
 

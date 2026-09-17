@@ -12,6 +12,7 @@ import { Sparkline } from "./components/Sparkline";
 import { SummaryPage } from "./components/SummaryPage";
 import { TabBar, type Page } from "./components/TabBar";
 import { TitleBar } from "./components/TitleBar";
+import { useIdentity } from "./hooks/useIdentity";
 import { useLibrary } from "./hooks/useLibrary";
 import { DEFAULT_SPEED, nextSpeed, usePlayback } from "./hooks/usePlayback";
 import { usePrescan } from "./hooks/usePrescan";
@@ -82,6 +83,8 @@ export function App() {
      recordings page starts, so coming back to it is a fresh listing too. */
   const library = useLibrary(page !== null);
   const saved = useSaved();
+  /* Who you are, read off the game's own folder once its rows are parsed. */
+  const identity = useIdentity(saved.entries, library.state?.folders);
 
   /* Everything that means "go to the list of recordings": the tab, Show all on
      the summary, and a parse that failed and has to say so somewhere. It opens
@@ -293,6 +296,7 @@ export function App() {
           <FilesPage
             library={library}
             saved={saved}
+            identity={identity}
             prescan={prescan}
             busy={busy}
             openNames={openNames}

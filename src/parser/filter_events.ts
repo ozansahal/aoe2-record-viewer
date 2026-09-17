@@ -376,6 +376,11 @@ function buildJson(match: Match, rows: EventRow[], deduped: boolean, extras: Rec
       winner: Boolean(p.winner),
       resigned: Boolean(p.resigned),
       ...(extras.get(p.number) || {}),
+      /* The DE profile id, which is the one thing about a player that is the
+         same from game to game: names are whatever the lobby showed and can
+         be changed between matches. An AI seat carries 0xFFFFFFFF. Appended
+         last, so everything before it is byte-identical to what this wrote. */
+      profile_id: p.profile_id,
     })),
     series: match.players.map((p: Rec) => ({
       player: p.number,

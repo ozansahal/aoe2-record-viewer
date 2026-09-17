@@ -6,7 +6,7 @@ import type { Platform } from "./types";
  * The preload bridge, as the app asks for it.
  *
  * Every call here is an IPC round trip to the main process. Nothing forwards a
- * path: `library.source` carries an entry id from a previous listing and
+ * path: `library.source` carries a folder and entry id from a previous listing and
  * `pickRecordings` a token from the last dialog, and the main process resolves
  * both back to a file itself.
  */
@@ -27,13 +27,14 @@ export function electronPlatform(bridge: Aoe2Bridge): Platform {
 
     library: {
       list: () => bridge.library.list(),
-      choose: () => bridge.library.choose(),
+      add: () => bridge.library.add(),
+      remove: (dir) => bridge.library.remove(dir),
       source: (entry) => ({
         name: entry.name,
-        bytes: async () => (await bridge.library.open(entry.id)).bytes,
+        bytes: async () => (await bridge.library.open(entry.root, entry.id)).bytes,
       }),
-      reveal: (id) => bridge.library.reveal(id),
-      trash: (id) => bridge.library.trash(id),
+      reveal: (entry) => bridge.library.reveal(entry.root, entry.id),
+      trash: (entry) => bridge.library.trash(entry.root, entry.id),
     },
 
     zoom: bridge.zoom,

@@ -11,20 +11,23 @@ export interface Library {
   state: LibraryState | null;
   scanning: boolean;
   refresh: () => Promise<void>;
-  choose: () => Promise<void>;
+  /** The folder picker; a cancelled one changes nothing. */
+  add: () => Promise<void>;
+  /** Takes a folder off the list. Nothing on disk is touched. */
+  remove: (dir: string) => Promise<void>;
   /** Null in a browser, so the panel that needs it is never rendered. */
   source: ((entry: LibraryEntry) => Source) | null;
-  reveal: (id: string) => void;
+  reveal: (entry: LibraryEntry) => void;
   /**
    * Moves a file to the OS trash and re-lists, so the row goes with it.
    * Rejects rather than swallowing: this is the one call that destroys
    * something, and the page has to be able to say it did not work.
    */
-  trash: (id: string) => Promise<void>;
+  trash: (entry: LibraryEntry) => Promise<void>;
 }
 
 /**
- * The recordings folder, as the renderer sees it.
+ * The recordings folders, as the renderer sees them.
  *
  * Scans only while `active` -- the panel being open -- since a folder with a
  * few thousand replays is a few thousand stats. There is no cache on either
@@ -48,26 +51,38 @@ export function useLibrary(active: boolean): Library {
     }
   }, [api]);
 
-  const choose = useCallback(async () => {
+  const add = useCallback(async () => {
     if (!api) return;
     setScanning(true);
     try {
-      const chosen = await api.choose();
-      if (chosen) setState(chosen); // null means the dialog was cancelled
+      const added = await api.add();
+      if (added) setState(added); // null means the dialog was cancelled
     } catch (err) {
-      console.error("could not change folder:", err);
+      console.error("could not add folder:", err);
     } finally {
       setScanning(false);
     }
   }, [api]);
 
-  const reveal = useCallback((id: string) => {
-    void api?.reveal(id);
+  const remove = useCallback(async (dir: string) => {
+    if (!api) return;
+    setScanning(true);
+    try {
+      setState(await api.remove(dir));
+    } catch (err) {
+      console.error("could not remove folder:", err);
+    } finally {
+      setScanning(false);
+    }
   }, [api]);
 
-  const trash = useCallback(async (id: string) => {
+  const reveal = useCallback((entry: LibraryEntry) => {
+    void api?.reveal(entry);
+  }, [api]);
+
+  const trash = useCallback(async (entry: LibraryEntry) => {
     if (!api) return;
-    await api.trash(id);
+    await api.trash(entry);
     /* The listing is the only record of what is in the folder, and it has one
        row too many until this comes back. */
     await refresh();
@@ -89,7 +104,7 @@ export function useLibrary(active: boolean): Library {
   }, [api, active, refresh]);
 
   return useMemo(
-    () => ({ available: Boolean(api), state, scanning, refresh, choose, source, reveal, trash }),
-    [api, state, scanning, refresh, choose, source, reveal, trash],
+    () => ({ available: Boolean(api), state, scanning, refresh, add, remove, source, reveal, trash }),
+    [api, state, scanning, refresh, add, remove, source, reveal, trash],
   );
 }

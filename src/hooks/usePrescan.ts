@@ -110,10 +110,13 @@ export function usePrescan({ library, saved, busy }: Options): Prescan {
   refused.current ??= readFailures();
 
   const queue = useRef<LibraryEntry[]>([]);
-  /* Every recording this run has decided about, by name -- the same key the
-     files page merges the two lists on. Failures go in too: a file that is not
-     a recording, or is half-written, must not be retried on every rescan. */
+  /* Every recording this run has decided about, by folder and path -- a name
+     alone is not enough once there is more than one folder, since every
+     download is somebody's `rec.aoe2record`. Failures go in too: a file that
+     is not a recording, or is half-written, must not be retried on every
+     rescan. */
   const seen = useRef(new Set<string>());
+  const seenKey = (entry: LibraryEntry) => `${entry.root}|${entry.id}`;
   const running = useRef(false);
   const stopped = useRef(false);
 
@@ -134,7 +137,7 @@ export function usePrescan({ library, saved, busy }: Options): Prescan {
         const source = sourceRef.current?.(entry);
         if (!source) break; // the folder went away with the platform
         try {
-          const result = await scanSource(source, savedRef.current, entry.modified);
+          const result = await scanSource(source, savedRef.current, entry.modified, entry.root);
           if (result === "unsaved") {
             /* The store said no -- it is full, or this profile has no storage.
                `useSaved` has already put the reason on the page; carrying on
@@ -168,8 +171,15 @@ export function usePrescan({ library, saved, busy }: Options): Prescan {
     const entries = library.state?.entries;
     if (!entries?.length || !saved.ready || !library.source || stopped.current) return;
 
-    const known = new Set(saved.entries.map((row) => row.name));
-    const candidates = entries.filter((e) => !known.has(e.name) && !seen.current.has(e.name));
+    /* Parsed already, by name -- the store knows no path -- and, where the
+       row says which folder it came from, only for an entry in that folder.
+       A row that names none (a drop, or one from before folders were kept)
+       stands for every folder, as it always did. */
+    const known = new Set(
+      saved.entries.map((row) => (row.root === undefined ? row.name : `${row.root}|${row.name}`)),
+    );
+    const isKnown = (e: LibraryEntry) => known.has(e.name) || known.has(`${e.root}|${e.name}`);
+    const candidates = entries.filter((e) => !isKnown(e) && !seen.current.has(seenKey(e)));
 
     /* Anything a previous run could not read, and which has not changed since,
        is skipped without being parsed -- but still hidden from the list, which
@@ -178,7 +188,7 @@ export function usePrescan({ library, saved, busy }: Options): Prescan {
     const refusedNow: string[] = [];
     for (const entry of candidates) {
       if (refused.current?.has(failureKey(entry))) {
-        seen.current.add(entry.name); // decided; do not weigh it again
+        seen.current.add(seenKey(entry)); // decided; do not weigh it again
         refusedNow.push(entry.name);
       } else {
         fresh.push(entry);
@@ -198,7 +208,7 @@ export function usePrescan({ library, saved, busy }: Options): Prescan {
        start evicting what this same pass wrote a minute ago. */
     const room = MAX_SCANNED - queue.current.length;
     const take = fresh.slice(0, Math.max(0, room));
-    for (const entry of take) seen.current.add(entry.name);
+    for (const entry of take) seen.current.add(seenKey(entry));
     queue.current.push(...take);
     setProgress((p) => ({ done: p.done, total: p.total + take.length }));
     void pump();

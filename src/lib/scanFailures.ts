@@ -45,7 +45,7 @@ const MAX = 600;
 
 /** Changes whenever the file does, which is the whole point -- see above. */
 export function failureKey(entry: LibraryEntry): string {
-  return `${entry.id}|${entry.size}|${entry.modified}`;
+  return `${entry.root}|${entry.id}|${entry.size}|${entry.modified}`;
 }
 
 export function readFailures(): Set<string> {

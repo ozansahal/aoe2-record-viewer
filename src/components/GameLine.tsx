@@ -121,7 +121,15 @@ function who(entry: SavedEntry) {
  * column with a marked-up margin rather than as lines that start in different
  * places.
  */
-export function Gutter({ entry }: { entry: SavedEntry | null }) {
+export function Gutter({ entry, mine }: {
+  entry: SavedEntry | null;
+  /**
+   * Whether the recording is one of your games -- see `useIdentity`. False
+   * marks the row: the owner is somebody else, so the crown, if there is
+   * one, is theirs. Null, or left out, says nothing either way.
+   */
+  mine?: boolean | null;
+}) {
   return (
     <span className={styles.gutter}>
       {entry && entry.humans >= 2 ? (
@@ -135,7 +143,35 @@ export function Gutter({ entry }: { entry: SavedEntry | null }) {
           <Crown />
         </span>
       ) : null}
+      {entry && mine === false ? (
+        <span
+          className={styles.other}
+          title={`Recorded by ${entry.players[entry.pov!]?.name ?? "somebody else"}, not you`}
+        >
+          <Other />
+        </span>
+      ) : null}
     </span>
+  );
+}
+
+/*
+ * Somebody else's recording: a figure, outlined. The file was written by a
+ * player who is not you -- a replay you downloaded or were sent -- and nothing
+ * else on the row says so: the roster looks the same either way, and the
+ * crown crowns whoever the file belongs to. Outlined rather than filled so it
+ * does not compete with the crown, which is the mark that means something
+ * went well.
+ */
+function Other() {
+  return (
+    <svg className={styles.figure} viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="5" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M2.8 14.2c.5-3.1 2.6-4.6 5.2-4.6s4.7 1.5 5.2 4.6"
+        fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
