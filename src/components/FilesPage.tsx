@@ -1,6 +1,7 @@
 import {
   Fragment,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -10,6 +11,7 @@ import {
 } from "react";
 
 import type { LibraryEntry } from "../electron";
+import type { Candidate, IdentityState } from "../hooks/useIdentity";
 import type { Library } from "../hooks/useLibrary";
 import type { Prescan } from "../hooks/usePrescan";
 import type { Saved } from "../hooks/useSaved";
@@ -24,10 +26,16 @@ import { GameLine, Gutter, roster } from "./GameLine";
 /*
  * Everything there is to open, in one list.
  *
- * Two places recordings come from -- the folder the game writes to, and the
- * parses kept in this browser -- and they used to be two panels you toggled
- * between. They answer the same question, so they are one page now, sorted
- * together by when you last touched them.
+ * Two places recordings come from -- the folders the game writes to and you
+ * add, and the parses kept in this browser -- and they used to be two panels
+ * you toggled between. They answer the same question, so they are one page
+ * now, sorted together by when you last touched them.
+ *
+ * Not every recording in it is one of your games. The game writes its own
+ * into one folder; anything downloaded is wherever it was saved to, and the
+ * folder list is how both are read at once. The two look the same on a row,
+ * so the row says which is which -- see `useIdentity` -- and the list can be
+ * cut to either.
  *
  * It is also the permanent first tab, and the only place a file dialog is
  * opened from -- the toolbar that used to carry that button is gone, so
@@ -162,6 +170,9 @@ const DOC = "M9.1 2.3H4.7a.9.9 0 0 0-.9.9v9.6a.9.9 0 0 0 .9.9h6.6a.9.9 0 0 0 .9-
 const BIN = "M2.9 4.4h10.2M6.4 4.4V3.2a.8.8 0 0 1 .8-.8h1.6a.8.8 0 0 1 .8.8v1.2"
   + "M4.4 4.4l.5 8a.9.9 0 0 0 .9.9h4.4a.9.9 0 0 0 .9-.9l.5-8";
 
+/** A cross, for taking a folder off the list. */
+const CROSS = "M4.5 4.5l7 7M11.5 4.5l-7 7";
+
 /** The three dots, drawn for the same reason the two above are. */
 function Dots() {
   return (
@@ -197,7 +208,13 @@ interface Action {
  * button's rect at the moment it opens, and any scroll closes it -- a menu
  * that stayed put while its row slid away would be pointing at nothing.
  */
-function RowMenu({ label, actions }: { label: string; actions: Action[] }) {
+function RowMenu({ label, actions, trigger, className }: {
+  label: string;
+  actions: Action[];
+  /** What the button shows. The dots, unless the menu is not a row's. */
+  trigger?: ReactNode;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -265,13 +282,14 @@ function RowMenu({ label, actions }: { label: string; actions: Action[] }) {
     <>
       <button
         ref={button}
-        className={styles.more}
-        aria-label={`More for ${label}`}
+        className={className ?? styles.more}
+        aria-label={trigger ? undefined : `More for ${label}`}
+        title={trigger ? label : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
       >
-        <Dots />
+        {trigger ?? <Dots />}
       </button>
       {open ? (
         <div ref={menu} className={styles.menu} role="menu" onKeyDown={arrows}>
@@ -308,15 +326,32 @@ interface Row {
 /** Folder first, then whatever is saved and no longer in it. Newest first. */
 function merge(entries: LibraryEntry[], saved: SavedEntry[]): Row[] {
   /* By name, because the two sides have no id in common: the folder knows a
-     path and the store a fingerprint of the bytes. Two different recordings
-     sharing a name is the cost, and it costs one row. */
-  const spare = new Map(saved.map((s) => [s.name, s]));
-  const rows: Row[] = entries.map((entry) => {
-    const hit = spare.get(entry.name) ?? null;
-    if (hit) spare.delete(entry.name);
-    return { key: `f:${entry.id}`, name: entry.name, when: entry.modified, entry, saved: hit };
-  });
-  for (const s of spare.values()) {
+     path and the store a fingerprint of the bytes. With more than one folder
+     the same name turns up more than once -- every download is somebody's
+     `rec.aoe2record` -- so among the parses of a name, the one that was found
+     in this entry's folder comes first, then one that names no folder at all
+     (a drop, or a row from before folders were kept), then whatever is left.
+     Two recordings sharing a name *and* a folder is still one row. */
+  const spare = new Map<string, SavedEntry[]>();
+  for (const s of saved) {
+    const list = spare.get(s.name);
+    if (list) list.push(s);
+    else spare.set(s.name, [s]);
+  }
+  const take = (entry: LibraryEntry): SavedEntry | null => {
+    const list = spare.get(entry.name);
+    if (!list?.length) return null;
+    const at = [
+      list.findIndex((s) => s.root === entry.root),
+      list.findIndex((s) => s.root === undefined),
+      0,
+    ].find((i) => i >= 0)!;
+    return list.splice(at, 1)[0]!;
+  };
+  const rows: Row[] = entries.map((entry) => ({
+    key: `f:${entry.root}|${entry.id}`, name: entry.name, when: entry.modified, entry, saved: take(entry),
+  }));
+  for (const s of [...spare.values()].flat()) {
     /* The file's own last-edit time if the row ever saw a folder listing,
        which is when the game was; `openedAt` is only when this app last looked
        at it, and it moves. */
@@ -337,16 +372,34 @@ function merge(entries: LibraryEntry[], saved: SavedEntry[]): Row[] {
  */
 const isScenario = (row: Row) => !!row.saved?.scenario;
 
-/** Every term has to appear somewhere, so "mp 08.14" narrows to one evening. */
+/** The last segment of a folder path, which is what it is called in a list. */
+const basename = (dir: string) => dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
+
+/**
+ * Every term has to appear somewhere, so "mp 08.14" narrows to one evening.
+ * Player names are in there too, so an opponent's name finds the games they
+ * were in, and the folder's own name, so "downloads" finds what came from it.
+ */
 function matches(row: Row, terms: string[]): boolean {
   if (!terms.length) return true;
-  const hay = `${row.entry?.folder ?? ""}/${row.name} ${row.saved?.map ?? ""} ${row.saved?.difficulty ?? ""}`.toLowerCase();
+  const hay = [
+    row.entry ? basename(row.entry.root) : "",
+    `${row.entry?.folder ?? ""}/${row.name}`,
+    row.saved?.map ?? "",
+    row.saved?.difficulty ?? "",
+    ...(row.saved?.players.map((p) => p.name) ?? []),
+  ].join(" ").toLowerCase();
   return terms.every((term) => hay.includes(term));
 }
+
+/** All of the list, only your games, or only everyone else's. */
+type Whose = "all" | "mine" | "others";
 
 interface Props {
   library: Library;
   saved: Saved;
+  /** Who you are, so a row can say whether the game was yours. */
+  identity: IdentityState;
   /** The folder being read through in the background. Idle in a browser. */
   prescan: Prescan;
   /** A parse is running; opening another one now would race it. */
@@ -365,10 +418,14 @@ interface Props {
 }
 
 export function FilesPage({
-  library, saved, prescan, busy, openNames,
+  library, saved, identity, prescan, busy, openNames,
   onPick, onOpenLibrary, onOpenSaved, onReparse, onFiles, status, error,
 }: Props) {
   const [query, setQuery] = useState("");
+  const [whose, setWhose] = useState<Whose>("all");
+  /* The folder list, under the head when it is open. Closed by default: the
+     folders change once, the list is looked at every day. */
+  const [foldersShown, setFoldersShown] = useState(false);
   /* Off by default, and per session: hiding them is the point, but a list that
      cannot be talked into showing what it is holding back is a list you have
      to leave to check something. */
@@ -377,6 +434,7 @@ export function FilesPage({
      that the filesystem refused. Cleared by the next one that works. */
   const [notice, setNotice] = useState<string | null>(null);
   const { state, scanning } = library;
+  const folders = state?.folders ?? [];
   /* Only for naming the place a deleted file goes. Windows calls it something
      else, and a dialog that uses the wrong word for it is a dialog you read
      twice before answering. */
@@ -407,7 +465,7 @@ export function FilesPage({
     if (!confirm(ask)) return;
     void (async () => {
       try {
-        await library.trash(entry.id);
+        await library.trash(entry);
         if (row.saved) await saved.remove(row.saved.id);
         setNotice(null);
       } catch (err) {
@@ -436,11 +494,21 @@ export function FilesPage({
     () => (scenariosShown || !scenarios ? rows : rows.filter((row) => !isScenario(row))),
     [rows, scenarios, scenariosShown],
   );
+  /* "Others" is the rows the list can say are somebody else's; a row with no
+     parse yet, or no owner named, is neither and only shows under "All". */
+  const whoseRows = useMemo(() => {
+    if (whose === "all" || !identity.identity) return listed;
+    return listed.filter((row) => identity.isMine(row.saved) === (whose === "mine"));
+  }, [listed, whose, identity]);
+  const others = useMemo(
+    () => listed.reduce((n, row) => n + (identity.isMine(row.saved) === false ? 1 : 0), 0),
+    [listed, identity],
+  );
   const terms = useMemo(
     () => query.toLowerCase().split(/\s+/).filter(Boolean),
     [query],
   );
-  const found = useMemo(() => listed.filter((r) => matches(r, terms)), [listed, terms]);
+  const found = useMemo(() => whoseRows.filter((r) => matches(r, terms)), [whoseRows, terms]);
   const shown = useMemo(() => found.slice(0, MAX_ROWS), [found]);
   /* The heading each row needs above it, or null when the row before it is
      already under the same one. Recomputed with the rows, and not per row, so
@@ -470,11 +538,61 @@ export function FilesPage({
   return (
     <section className={styles.library} aria-label="Recordings">
       <div className={styles.head}>
-        {state?.folder ? (
-          <span className={styles.path} title={state.folder}>{state.folder}</span>
+        {/* Which folders, as one button that opens the list of them. With one
+            folder its path is the label, since that is what the one-folder
+            head used to show; with more, how many, since no path stands for
+            the lot. */}
+        {folders.length ? (
+          <button
+            className={styles.path}
+            title={folders.map((f) => f.path).join("\n")}
+            aria-expanded={foldersShown}
+            onClick={() => setFoldersShown((was) => !was)}
+          >
+            <Glyph d={FOLDER} />
+            <span className={styles.pathText}>
+              {folders.length === 1 ? folders[0]!.path : `${folders.length} folders`}
+            </span>
+          </button>
         ) : null}
-        {state?.detected ? <span className={styles.chip}>detected</span> : null}
+        {folders.length === 1 && folders[0]!.detected ? <span className={styles.chip}>detected</span> : null}
+        {/* Who you are: the name the rows are marked against, and the way to
+            change it. Only once there is somebody to be -- a browser with no
+            saved rows has no candidates to offer. */}
+        {identity.identity || identity.candidates.length ? (
+          <RowMenu
+            className={`${styles.chip} ${styles.who}`}
+            label={identity.identity
+              ? `You are ${identity.identity.name}${identity.identity.manual ? " (chosen)" : ""}. Rows the game recorded for someone else are marked.`
+              : "Choose which player is you, so the list can mark the games that are not yours"}
+            trigger={<>you: {identity.identity ? identity.identity.name : "?"}</>}
+            actions={[
+              ...identity.candidates.map((c: Candidate) => ({
+                label: `${c.name} \u00b7 ${c.games} ${c.games === 1 ? "game" : "games"}`,
+                hint: `Profile ${c.profileId}`,
+                disabled: identity.identity?.profileId === c.profileId && identity.identity.manual,
+                run: () => identity.choose(c),
+              })),
+              {
+                label: "Detect automatically",
+                hint: "Whoever recorded most of the games in the game's own folder",
+                disabled: !identity.identity?.manual,
+                run: identity.detect,
+              },
+            ]}
+          />
+        ) : null}
         <span className={ui.spacer} />
+        {/* Mine and everyone else's, once the list has both. */}
+        {identity.identity && others ? (
+          <div className={styles.seg} role="group" aria-label="Whose games">
+            {(["all", "mine", "others"] as const).map((w) => (
+              <button key={w} aria-pressed={whose === w} onClick={() => setWhose(w)}>
+                {w === "all" ? "All" : w === "mine" ? "Mine" : "Others"}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {rows.length ? (
           <input
             className={styles.search}
@@ -498,10 +616,12 @@ export function FilesPage({
             >
               <Reload turning={scanning || prescan.active} />
             </button>
-            <button className={ui.ghost} onClick={() => void library.choose()} disabled={scanning}>
-              <Glyph d={FOLDER} />
-              {state?.folder ? "Change folder..." : "Choose folder..."}
-            </button>
+            {!folders.length ? (
+              <button className={ui.ghost} onClick={() => void library.add()} disabled={scanning}>
+                <Glyph d={FOLDER} />
+                Add folder...
+              </button>
+            ) : null}
           </>
         ) : null}
         {saved.entries.length ? (
@@ -540,6 +660,38 @@ export function FilesPage({
           and a solid one a pixel outside it read as a mistake. */}
       <div className={bare ? styles.bare : styles.frame}>
 
+      {/* The folders the list is read from. One line each, with the way to
+          take it off and, at the bottom, the way to add one. Removing deletes
+          nothing -- the files stay, and so do their kept parses, which is why
+          it does not ask first. */}
+      {foldersShown && folders.length ? (
+        <div className={styles.folders}>
+          {folders.map((f) => (
+            <div key={f.path} className={styles.folder}>
+              <span className={styles.folderPath} title={f.path}>{f.path}</span>
+              {f.detected ? <span className={styles.chip}>detected</span> : null}
+              {f.error ? <span className={styles.folderErr}>{f.error}</span> : null}
+              <span className={ui.spacer} />
+              <button
+                className={styles.folderRemove}
+                aria-label={`Stop listing ${f.path}`}
+                title="Take this folder off the list. Nothing in it is deleted."
+                disabled={scanning}
+                onClick={() => void library.remove(f.path)}
+              >
+                <Glyph d={CROSS} />
+              </button>
+            </div>
+          ))}
+          <div className={styles.folder}>
+            <button className={ui.ghost} onClick={() => void library.add()} disabled={scanning}>
+              <Glyph d={FOLDER} />
+              Add folder...
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* What the background scan is doing, and the way out of it. It is CPU
           nobody asked for, so it says so and can be stopped. */}
       {prescan.total ? (
@@ -553,7 +705,11 @@ export function FilesPage({
 
       {notice ? <div className={`${styles.empty} ${styles.err}`}>{notice}</div> : null}
       {saved.error ? <div className={`${styles.empty} ${styles.err}`}>{saved.error}</div> : null}
-      {state?.error ? <div className={`${styles.empty} ${styles.err}`}>{state.error}</div> : null}
+      {/* A folder that cannot be read, said here while the list of them is
+          closed; open, the folder's own line carries it. */}
+      {!foldersShown ? folders.filter((f) => f.error).map((f) => (
+        <div key={f.path} className={`${styles.empty} ${styles.err}`}>{f.path}: {f.error}</div>
+      )) : null}
 
       {/* How the last attempt to open something went. It belongs here, with the
           button that starts one: a file can be dropped on a match, and the
@@ -565,7 +721,7 @@ export function FilesPage({
         <div className={error ? `${styles.empty} ${styles.err}` : styles.empty}>{status}</div>
       ) : null}
 
-      {library.available && state && !state.folder ? (
+      {library.available && state && !folders.length ? (
         <div className={styles.empty}>
           <div>No recordings folder yet.</div>
           <div className={ui.hint}>
@@ -616,7 +772,7 @@ export function FilesPage({
                   >
                     {/* What the row is, ahead of both its lines and in a
                         gutter of its own. See `Gutter` in GameLine.tsx. */}
-                    <Gutter entry={kept} />
+                    <Gutter entry={kept} mine={identity.isMine(kept)} />
                     <span className={styles.lines}>
                     {/* What the game was, which is what you are looking for.
                         Only a parsed recording knows any of it; until then the
@@ -648,7 +804,12 @@ export function FilesPage({
                           deleted. Only what was imported after this existed
                           knows which it was; the rest keep the old word. */}
                       {entry ? (
-                        <span className={styles.src}>{entry.folder || "folder"}</span>
+                        /* Which folder, by name, once there is more than one
+                           to tell apart; the sub-folder either way. */
+                        <span className={styles.src} title={entry.root}>
+                          {[folders.length > 1 ? basename(entry.root) : "", entry.folder]
+                            .filter(Boolean).join("/") || "folder"}
+                        </span>
                       ) : kept!.loaded ? (
                         <span
                           className={`${styles.src} ${styles.loaded}`}
@@ -678,7 +839,7 @@ export function FilesPage({
                     ...(entry ? [{
                       label: "Show in folder",
                       hint: "Show in file manager",
-                      run: () => library.reveal(entry.id),
+                      run: () => library.reveal(entry),
                     }] : []),
                     ...(entry && kept ? [{
                       label: "Re-parse",
@@ -731,10 +892,10 @@ export function FilesPage({
           </button>
         </div>
       ) : null}
-      {state?.truncated ? (
+      {folders.some((f) => f.truncated) ? (
         <div className={styles.foot}>
-          This folder holds more files than the scan reads; pick a folder closer to
-          the recordings.
+          {folders.filter((f) => f.truncated).map((f) => basename(f.path)).join(", ")} holds
+          more files than the scan reads; pick a folder closer to the recordings.
         </div>
       ) : null}
       {/* Said rather than done silently: they are still in the folder, and a

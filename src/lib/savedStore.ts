@@ -38,7 +38,10 @@ const PAYLOADS = "payloads";
  * files page has the other two: "Re-parse" on a single row, and "Clear saved"
  * for the lot, neither of which needs a release.
  */
-export const PAYLOAD_V = 13;
+export const PAYLOAD_V = 14;
+
+/** What the parser reports as the profile id of an AI seat: 0xFFFFFFFF. */
+export const AI_PROFILE = 4294967295;
 
 /** Oldest by last-opened past this are dropped. ~100 payloads is ~10 MB. */
 export const MAX_SAVED = 100;
@@ -84,7 +87,19 @@ export interface SavedEntry {
   duration: number;
   /** As the recording states it -- "Hard", "Standard". Listed beside the map. */
   difficulty: string;
-  players: { name: string; civilization: string; color: string; winner: boolean }[];
+  players: {
+    name: string;
+    civilization: string;
+    color: string;
+    winner: boolean;
+    /**
+     * The DE profile id -- see `Player.profile_id`. It is what "is this
+     * player me" is answered by: a name is whatever the lobby showed that
+     * game, and can be changed between two of them. Absent on an AI seat's
+     * sentinel value and on a payload exported before it was carried.
+     */
+    profileId?: number;
+  }[];
   /**
    * How many of them were at a keyboard. Two or more is a multiplayer game,
    * which is the one thing about a row you cannot read off the rest of it --
@@ -126,6 +141,14 @@ export interface SavedEntry {
    * folder, and neither gets the tag.
    */
   loaded?: boolean;
+  /**
+   * The absolute path of the recordings folder this was found in, when it came
+   * off a folder row. It is how the list can ask "which of these did the game
+   * itself write" once the folder is no longer being listed -- which is what
+   * working out who you are needs. Absent on drops, picks, and anything an
+   * older parser wrote.
+   */
+  root?: string;
 }
 
 export interface Usage {
@@ -254,6 +277,8 @@ export interface SaveOptions {
    * has to survive that -- it is a fact about the file, not about the row.
    */
   modified?: number;
+  /** The folder the recording was found in. Kept like `modified` is. */
+  root?: string;
 }
 
 /** Re-saving the same recording keeps its original `savedAt`. */
@@ -261,7 +286,7 @@ export async function saveRecording(
   id: string,
   name: string,
   payload: Payload,
-  { scanned = false, loaded = false, at, modified }: SaveOptions = {},
+  { scanned = false, loaded = false, at, modified, root }: SaveOptions = {},
 ): Promise<SavedEntry> {
   const db = await open();
   const now = Date.now();
@@ -285,6 +310,7 @@ export async function saveRecording(
        from bytes alone must not lose the date the folder row already gave this
        recording. */
     ...(modified ?? existing?.modified ? { modified: modified ?? existing?.modified } : {}),
+    ...(root ?? existing?.root ? { root: root ?? existing?.root } : {}),
     ...(scanned && !keepOpened ? { scanned: true } : {}),
     /* Where it first came from, so opening it a second time -- off a folder
        row, or after a scan has been over it -- does not rewrite its history. */
@@ -298,6 +324,9 @@ export async function saveRecording(
       civilization: p.civilization,
       color: p.color,
       winner: p.winner,
+      /* The AI sentinel is left out rather than stored: it would otherwise be
+         a "profile" that every AI seat in the store shares. */
+      ...(p.profile_id !== undefined && p.profile_id !== AI_PROFILE ? { profileId: p.profile_id } : {}),
     })),
     humans: payload.players.filter((p) => !p.is_ai).length,
     /* By player number, because the payload's array is in seat order and a

@@ -15,18 +15,20 @@ import type { Source } from "../lib/sources";
 
 export type PlatformEnv = "electron" | "browser";
 
-/** The recordings folder. Electron only -- a browser cannot read a directory. */
+/** The recordings folders. Electron only -- a browser cannot read a directory. */
 export interface LibraryApi {
   /** Re-scans every time; there is no cache on either side. */
   list(): Promise<LibraryState>;
   /** Native folder picker. Resolves null when cancelled, else the new listing. */
-  choose(): Promise<LibraryState | null>;
+  add(): Promise<LibraryState | null>;
+  /** Takes a folder off the list. Deletes nothing; resolves the new listing. */
+  remove(dir: string): Promise<LibraryState>;
   /** One entry as a source. The bytes are not read until it is opened. */
   source(entry: LibraryEntry): Source;
   /** Shows the file in the OS file manager. */
-  reveal(id: string): Promise<void>;
+  reveal(entry: LibraryEntry): Promise<void>;
   /** Moves the file to the OS trash, so a mis-click can be put back. */
-  trash(id: string): Promise<void>;
+  trash(entry: LibraryEntry): Promise<void>;
 }
 
 /**

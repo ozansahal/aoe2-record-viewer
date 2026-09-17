@@ -183,12 +183,12 @@ export function useRecordingTabs({ saved, library }: Options): RecordingTabs {
    */
   const loadAll = useCallback(async (
     sources: Source[],
-    entryId: string | null = null,
-    /* The folder row's mtime, when this came off one. Only a listing knows it,
-       and it is what dates the saved row afterwards -- see `modified` on
-       `SavedEntry`. */
-    modified?: number,
+    /* The folder row this came off, when it did. Only a listing knows the
+       file's mtime and which folder it sits in, and both go on the saved row
+       afterwards -- see `modified` and `root` on `SavedEntry`. */
+    entry: LibraryEntry | null = null,
   ): Promise<boolean> => {
+    const entryId = entry?.id ?? null;
     if (!sources.length) return false;
     const failures: string[] = [];
     let shown = false;
@@ -198,8 +198,9 @@ export function useRecordingTabs({ saved, library }: Options): RecordingTabs {
          "this did not come off a row of the recordings folder" -- which is
          what the list tags as loaded. */
       const message = await load(source.name, () => openSource(source, saved, {
-        loaded: !entryId,
-        modified,
+        loaded: !entry,
+        modified: entry?.modified,
+        root: entry?.root,
       }), {
         entryId,
         status: `Parsing ${source.name}${of} — this takes a moment...`,
@@ -225,7 +226,7 @@ export function useRecordingTabs({ saved, library }: Options): RecordingTabs {
 
   const openFromLibrary = useCallback(async (entry: LibraryEntry) => {
     if (!library.source) return false;
-    return loadAll([library.source(entry)], entry.id, entry.modified);
+    return loadAll([library.source(entry)], entry);
   }, [loadAll, library]);
 
   /* One row of the saved list: nothing is read off disk and nothing is parsed. */

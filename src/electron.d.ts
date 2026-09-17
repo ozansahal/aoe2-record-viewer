@@ -10,10 +10,12 @@ export interface SelectedRecording {
   name: string;
 }
 
-/** One file in the recordings folder. Mirrors `electron/library.ts`. */
+/** One file in a recordings folder. Mirrors `electron/library.ts`. */
 export interface LibraryEntry {
-  /** Path relative to the folder. The only handle the renderer has on a file. */
+  /** Path relative to `root`. With it, the only handle the renderer has on a file. */
   id: string;
+  /** The folder it was listed under -- one of `LibraryState.folders`. */
+  root: string;
   name: string;
   /** Sub-directory it was found in, "" at the top. */
   folder: string;
@@ -22,27 +24,37 @@ export interface LibraryEntry {
   modified: number;
 }
 
-export interface LibraryState {
-  folder: string | null;
-  /** The folder was found where the game installs it, rather than chosen. */
+export interface LibraryFolder {
+  /** Absolute. */
+  path: string;
+  /** It is the game's own savegame folder, found rather than chosen. */
   detected: boolean;
-  entries: LibraryEntry[];
-  /** The scan stopped at its cap, so the list is partial. */
-  truncated: boolean;
+  /** Set when this folder could not be read at all. The others still list. */
   error: string | null;
+  /** This folder's scan stopped at its cap, so its rows are partial. */
+  truncated: boolean;
+}
+
+export interface LibraryState {
+  /** In the order they were added; empty when none is set and none was found. */
+  folders: LibraryFolder[];
+  /** Every folder's recordings together, newest first. */
+  entries: LibraryEntry[];
 }
 
 export interface Aoe2Library {
   /** Re-scans every time; there is no cache on either side. */
   list(): Promise<LibraryState>;
   /** Native folder picker. Resolves null when cancelled, else the new listing. */
-  choose(): Promise<LibraryState | null>;
-  /** Reads one entry by id. Rejects if the id is not inside the folder. */
-  open(id: string): Promise<OpenedRecording>;
+  add(): Promise<LibraryState | null>;
+  /** Takes a folder off the list. Deletes nothing; resolves the new listing. */
+  remove(dir: string): Promise<LibraryState>;
+  /** Reads one entry. Rejects if the folder is not listed or the id escapes it. */
+  open(root: string, id: string): Promise<OpenedRecording>;
   /** Shows the file in the OS file manager. */
-  reveal(id: string): Promise<void>;
-  /** Moves the file to the OS trash. Rejects if the id is not one of ours. */
-  trash(id: string): Promise<void>;
+  reveal(root: string, id: string): Promise<void>;
+  /** Moves the file to the OS trash. Rejects if the entry is not one of ours. */
+  trash(root: string, id: string): Promise<void>;
 }
 
 /** The window's own buttons, since the native ones are gone. */

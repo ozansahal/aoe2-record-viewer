@@ -22,6 +22,12 @@ export interface Player {
   ai_name: string;
   is_ai: boolean;
   handicap: number;
+  /**
+   * The DE profile id -- the one identifier a player keeps from one game to
+   * the next, where a name is whatever the lobby showed that day. 4294967295
+   * on an AI seat. Absent from payloads exported before it was carried.
+   */
+  profile_id?: number;
 }
 
 /** SYNC stat samples: [seconds, total_resources, total_objects]. */

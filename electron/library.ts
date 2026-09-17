@@ -6,9 +6,10 @@
  * just played through a file dialog is miserable. This scans that folder once
  * and hands the renderer a list.
  *
- * Nothing here trusts the renderer with a path: it asks for an entry by its id,
- * which is a path relative to the chosen folder, and `resolveEntry` refuses
- * anything that escapes the folder or is not a recording.
+ * Nothing here trusts the renderer with a path: it asks for an entry by the
+ * folder it was listed under and its id, a path relative to that folder, and
+ * `resolveEntry` refuses a folder that is not on the list and an id that
+ * escapes it or is not a recording.
  */
 import { readdir, stat } from "node:fs/promises";
 import os from "node:os";
@@ -30,8 +31,10 @@ const MAX_DEPTH = 3;
 const MAX_ENTRIES = 4000;
 
 export interface LibraryEntry {
-  /** Path relative to the folder, POSIX-separated. What the renderer sends back. */
+  /** Path relative to `root`, POSIX-separated. What the renderer sends back. */
   id: string;
+  /** The folder it was found under -- one of `LibraryState.folders`. */
+  root: string;
   name: string;
   /** Sub-directory it was found in, "" at the top. */
   folder: string;
@@ -40,16 +43,22 @@ export interface LibraryEntry {
   modified: number;
 }
 
-export interface LibraryState {
-  /** Absolute, or null when nothing is set and nothing was found. */
-  folder: string | null;
-  /** True when the folder came from the game's install location, not a choice. */
+export interface LibraryFolder {
+  /** Absolute. */
+  path: string;
+  /** True when it is the game's own savegame folder, found rather than chosen. */
   detected: boolean;
-  entries: LibraryEntry[];
-  /** The scan stopped at its cap, so the list is partial. */
-  truncated: boolean;
-  /** Set when the folder could not be read at all. */
+  /** Set when this folder could not be read at all. The others still list. */
   error: string | null;
+  /** This folder's walk stopped at its cap, so its part of the list is partial. */
+  truncated: boolean;
+}
+
+export interface LibraryState {
+  /** In the order they were added. Empty when nothing is set and nothing was found. */
+  folders: LibraryFolder[];
+  /** Every folder's recordings together, newest first. */
+  entries: LibraryEntry[];
 }
 
 /* ---- where the game puts them ---- */
@@ -81,33 +90,74 @@ async function detectFolder(): Promise<string | null> {
   return null;
 }
 
-/* ---- the chosen folder, remembered across launches ---- */
+/* ---- the chosen folders, remembered across launches ---- */
 
-const SETTING = "libraryFolder";
+/*
+ * A list rather than one folder. The game writes into one place, and that one
+ * is found on its own; recordings other people sent are wherever they were
+ * saved to, and the list is how both are read at once. The game's folder is
+ * always the first entry unless it was removed, and it is what tells the
+ * renderer which recordings the game itself wrote -- see `detected`.
+ */
+const SETTING = "libraryFolders";
+/** The one-folder setting this replaced. Read once, for the migration. */
+const OLD_SETTING = "libraryFolder";
+/** Folders the user took off the list. Kept so a re-detect does not put the
+ *  game's own folder straight back. */
+const HIDDEN = "libraryHidden";
 
-/** undefined until resolved once; null means "none set and none found". */
-let folder: string | null | undefined;
-let detected = false;
+/** undefined until resolved once. */
+let folders: string[] | undefined;
+let detectedFolder: string | null = null;
 
-async function currentFolder(): Promise<string | null> {
-  if (folder !== undefined) return folder;
-  const saved = (await readSettings())[SETTING];
-  if (typeof saved === "string" && saved) {
-    folder = saved;
-    detected = false;
-  } else {
-    // Re-detected every launch rather than saved, so installing the game later
-    // is enough to make the list appear.
-    folder = await detectFolder();
-    detected = folder !== null;
-  }
-  return folder;
+function readList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string" && !!v) : [];
 }
 
-export async function setFolder(dir: string): Promise<LibraryState> {
-  folder = dir;
-  detected = false;
-  await writeSettings({ [SETTING]: dir });
+async function currentFolders(): Promise<string[]> {
+  if (folders !== undefined) return folders;
+  const settings = await readSettings();
+  let list = readList(settings[SETTING]);
+  /* The single-folder setting becomes a one-entry list. Written straight back,
+     so the next launch does not migrate again. */
+  const old = settings[OLD_SETTING];
+  if (!list.length && typeof old === "string" && old) {
+    list = [old];
+    await writeSettings({ [SETTING]: list, [OLD_SETTING]: undefined });
+  }
+  /* Re-detected every launch rather than saved, so installing the game later
+     is enough to make it appear -- and put first, since it is the folder the
+     list is for. Unless it was removed on purpose. */
+  detectedFolder = await detectFolder();
+  const hidden = new Set(readList(settings[HIDDEN]));
+  if (detectedFolder && !list.includes(detectedFolder) && !hidden.has(detectedFolder)) {
+    list = [detectedFolder, ...list];
+  }
+  folders = list;
+  return folders;
+}
+
+export async function addFolder(dir: string): Promise<LibraryState> {
+  const list = await currentFolders();
+  if (!list.includes(dir)) {
+    folders = [...list, dir];
+    await writeSettings({ [SETTING]: folders });
+  }
+  return listRecordings();
+}
+
+/** Only ever a folder from the list; anything else is a no-op. */
+export async function removeFolder(dir: string): Promise<LibraryState> {
+  const list = await currentFolders();
+  if (list.includes(dir)) {
+    folders = list.filter((f) => f !== dir);
+    const patch: Record<string, unknown> = { [SETTING]: folders };
+    if (dir === detectedFolder) {
+      const hidden = readList((await readSettings())[HIDDEN]);
+      patch[HIDDEN] = [...new Set([...hidden, dir])];
+    }
+    await writeSettings(patch);
+  }
   return listRecordings();
 }
 
@@ -141,6 +191,7 @@ async function walk(dir: string, depth: number, out: LibraryEntry[], root: strin
     const relative = path.relative(root, full);
     out.push({
       id: relative.split(path.sep).join("/"),
+      root,
       name: entry.name,
       folder: path.dirname(relative) === "." ? "" : path.dirname(relative).split(path.sep).join("/"),
       size: info.size,
@@ -155,38 +206,38 @@ async function walk(dir: string, depth: number, out: LibraryEntry[], root: strin
   }
 }
 
-export async function listRecordings(): Promise<LibraryState> {
-  const root = await currentFolder();
-  if (!root) return { folder: null, detected: false, entries: [], truncated: false, error: null };
-
+async function scanFolder(root: string): Promise<{ folder: LibraryFolder; entries: LibraryEntry[] }> {
+  const folder: LibraryFolder = {
+    path: root, detected: root === detectedFolder, error: null, truncated: false,
+  };
   try {
     if (!(await stat(root)).isDirectory()) throw new Error("not a folder");
   } catch (err) {
-    return {
-      folder: root,
-      detected,
-      entries: [],
-      truncated: false,
-      error: `Cannot read this folder: ${(err as Error).message}`,
-    };
+    folder.error = `Cannot read this folder: ${(err as Error).message}`;
+    return { folder, entries: [] };
   }
-
   const entries: LibraryEntry[] = [];
   await walk(root, 0, entries, root);
-  entries.sort((a, b) => b.modified - a.modified);
-  return {
-    folder: root,
-    detected,
-    entries,
-    truncated: entries.length >= MAX_ENTRIES,
-    error: null,
-  };
+  folder.truncated = entries.length >= MAX_ENTRIES;
+  return { folder, entries };
 }
 
-/** An absolute path for an entry id, or null if the id is not one of ours. */
-export async function resolveEntry(id: string): Promise<string | null> {
-  const root = await currentFolder();
-  if (!root || typeof id !== "string" || !id) return null;
+export async function listRecordings(): Promise<LibraryState> {
+  const roots = await currentFolders();
+  const scanned = await Promise.all(roots.map(scanFolder));
+  const entries = scanned.flatMap((s) => s.entries);
+  entries.sort((a, b) => b.modified - a.modified);
+  return { folders: scanned.map((s) => s.folder), entries };
+}
+
+/**
+ * An absolute path for an entry, or null if it is not one of ours: `root` has
+ * to be a folder on the list, exactly as the listing gave it, and `id` a
+ * recording inside it.
+ */
+export async function resolveEntry(root: unknown, id: unknown): Promise<string | null> {
+  if (typeof root !== "string" || typeof id !== "string" || !id) return null;
+  if (!(await currentFolders()).includes(root)) return null;
   if (!LISTED.has(path.extname(id).slice(1).toLowerCase())) return null;
   const target = path.resolve(root, id);
   const relative = path.relative(root, target);

@@ -74,7 +74,7 @@ export async function openSource(
      it -- a drop hands us bytes and a name and nothing else. It is carried
      because it is the one date that says when the *game* was, rather than when
      this app happened to look at it. */
-  { loaded = false, modified }: { loaded?: boolean; modified?: number } = {},
+  { loaded = false, modified, root }: { loaded?: boolean; modified?: number; root?: string } = {},
 ): Promise<Loaded> {
   const bytes = await source.bytes();
   const id = await keyFor(source.name, bytes);
@@ -83,7 +83,7 @@ export async function openSource(
   if (hit) return { payload: hit, note: `${source.name} — from saved recordings`, savedId: id };
 
   const read = await loadRecordingBytes(source.name, bytes);
-  const entry = await store.remember(id, source.name, read.payload, { loaded, modified });
+  const entry = await store.remember(id, source.name, read.payload, { loaded, modified, root });
   return { ...read, savedId: entry?.id };
 }
 
@@ -106,6 +106,8 @@ export async function scanSource(
   source: Source,
   store: Store,
   at: number,
+  /** Which folder it was found in -- kept on the row, see `SavedEntry.root`. */
+  root?: string,
 ): Promise<ScanResult> {
   const bytes = await source.bytes();
   const id = await keyFor(source.name, bytes);
@@ -113,7 +115,7 @@ export async function scanSource(
 
   const loaded = await loadRecordingBytes(source.name, bytes);
   const entry = await store.remember(
-    id, source.name, loaded.payload, { scanned: true, at, modified: at },
+    id, source.name, loaded.payload, { scanned: true, at, modified: at, root },
   );
   return entry ? "kept" : "unsaved";
 }

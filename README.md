@@ -56,7 +56,7 @@ npm run dev
 | `src/components/`, `src/lib/` | The renderer. A component's hook and its `.module.css` sit beside it; `src/hooks/` is only for the two that more than one file imports |
 | `src/platform/` | What the app can ask of its host. `Platform` plus an Electron and a browser implementation, and the shell that provides one — nothing above it touches `window.aoe2` |
 | `src/styles/` | `global.css` (tokens, reset, scrollbars) and `ui.module.css`, the few rules more than one component needs |
-| `electron/` | Main process, preload, `library.ts` (the recordings folder), `zoom.ts` and `settings.ts` (what is kept across launches) |
+| `electron/` | Main process, preload, `library.ts` (the recordings folders), `zoom.ts` and `settings.ts` (what is kept across launches) |
 | `scripts/` | esbuild bundling for `electron/`, and the dev orchestrator |
 | `assets/` | The app icon, `.png` and `.ico` |
 
@@ -126,7 +126,7 @@ There is no menu, and the title bar is the app's own.
   the tab's; playback itself stops when you switch tabs or go back to the files
   page, since the playhead it moves belongs to whatever is on screen.
 
-## The recordings folder
+## The recordings folders
 
 Under Electron the app opens on a listing of the folder the game writes to, so
 loading yesterday's match is a click rather than a trip through a file dialog
@@ -136,21 +136,43 @@ appears — `window.aoe2.library` is undefined and the drop zone is all there is
 - **Found, not asked for.** On Windows the game keeps replays under
   `~/Games/Age of Empires 2 DE/<steam id>/savegame/`; under Proton the same
   layout sits inside the prefix. That path is re-detected every launch, so
-  installing the game later is enough. Choosing a folder overrides it and is
-  remembered in `settings.json` under `app.getPath("userData")` — the same file
-  the zoom factor is in, written through `electron/settings.ts`, which merges
-  over what is on disk and queues its writes so two settings saved at once
-  cannot lose each other.
+  installing the game later is enough.
+- **A list, not a folder.** Replays other people sent are wherever they were
+  saved to, so the page reads a list of folders: the detected one first, then
+  whatever was added through the folders panel (the button at the left of the
+  head opens it). Removing a folder deletes nothing and keeps its parses. The
+  list is `libraryFolders` in `settings.json` under `app.getPath("userData")`
+  — the same file the zoom factor is in, written through `electron/settings.ts`,
+  which merges over what is on disk and queues its writes so two settings saved
+  at once cannot lose each other. Taking the detected folder off puts it in
+  `libraryHidden` so the next launch's re-detect does not put it back. An old
+  single-string `libraryFolder` is migrated to the list on first read.
+- **Whose game it was.** A recording states which player's client wrote it
+  (`pov` on the payload), and for the game's own folder that player is you, so
+  `useIdentity` takes the profile that owns most of the detected folder's
+  parses as you — by DE profile id (`profile_id`, now on every `Player`), since
+  a name is whatever the lobby showed that day. A row whose owner is somebody
+  else gets a figure in the gutter next to the crown, the head has All / Mine /
+  Others, and the filter box matches player names. The chip in the head names
+  you and is a menu for choosing somebody else or going back to detection; the
+  pick lives in `localStorage` so a browser with saved rows can use it too.
 - **Recordings only.** The listing is `.aoe2record`, `.aoe2rec`, `.mgz`, `.mgx`
   and nothing else, three levels deep, newest first. `.json` is deliberately
   left out even though the dialog and drag-drop accept an exported
   `events.json`: DE writes telemetry and mod manifests as `.json` beside the
   replays, and they are newer than every recording in the folder.
-- **The renderer never handles a path.** It asks for an entry by the id a
-  listing gave it — a path relative to the folder — and `resolveEntry` in
-  `electron/library.ts` re-resolves that against the folder and refuses
-  anything that escapes it or is not a recording. The scan is capped at 4000
-  files so pointing the app at a home directory cannot hang it.
+- **The renderer never handles a path.** It asks for an entry by the folder
+  and id a listing gave it — a path relative to that folder — and
+  `resolveEntry` in `electron/library.ts` checks the folder is on the list,
+  re-resolves the id against it and refuses anything that escapes it or is not
+  a recording. The one path the renderer does send is the folder to remove,
+  and that only ever takes it off the list. Each folder's scan is capped at
+  4000 files so pointing the app at a home directory cannot hang it.
+- **Same name, two folders.** The files page matches folder rows to kept parses
+  by name, and every download is somebody's `rec.aoe2record`, so a parse that
+  knows which folder it came from (`root` on the saved row) goes to a row in
+  that folder first. The background scan keys on folder and path for the same
+  reason.
 
 The list re-scans whenever the window regains focus: alt-tab out of a match and
 back, and the replay you just finished is at the top.

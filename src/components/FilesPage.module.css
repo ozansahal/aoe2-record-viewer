@@ -35,13 +35,54 @@
    one makes the path take practically all of it until there is none of it
    left, which is the order it should go in. */
 .path {
-  min-width: 0; flex-shrink: 100; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; flex-shrink: 100; overflow: hidden; white-space: nowrap;
   font-size: var(--text-small); color: var(--ink-faint);
+  /* A button now -- it opens the list of folders -- but drawn as the text it
+     replaced, with the folder glyph in front to say it does something. */
+  display: flex; align-items: center; gap: var(--space-2);
+  border: 0; background: none; padding: 0; font-family: inherit; cursor: pointer;
 }
+.path:hover, .path[aria-expanded="true"] { color: var(--ink); }
+.pathText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .chip {
   flex: none; font-size: var(--text-small); letter-spacing: .05em; text-transform: uppercase;
   color: var(--ink-faint); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: var(--space-hair) var(--space-2);
 }
+/* The identity chip, which is a menu button in a chip's clothes. Ink rather
+   than faint: it carries a name, and a name is read where "detected" is only
+   glanced at. */
+.who { background: none; font-family: inherit; cursor: pointer; color: var(--ink-dim); text-transform: none; letter-spacing: 0; }
+.who:hover, .who[aria-expanded="true"] { color: var(--ink); border-color: var(--ink-faint); }
+
+/* All / Mine / Others. The same control ModeRow draws for its sort, so the
+   two read as the same kind of thing. */
+.seg { flex: none; display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+.seg button {
+  border: 0; background: var(--panel-2); color: var(--ink-dim); cursor: pointer;
+  padding: var(--space-2) var(--space-3); font: inherit; font-size: var(--text-control);
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.seg button + button { border-left: 1px solid var(--line); }
+
+/* The list of folders, at the top of the frame when it is open. Each line is
+   a path, and a path is the one thing here that can be any length, so it is
+   the thing that gives. */
+.folders { border-bottom: 1px solid var(--line); background: var(--panel-2); }
+.folder {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line);
+  font-size: var(--text-control); color: var(--ink-dim);
+}
+.folder:last-child { border-bottom: 0; }
+.folderPath { min-width: 0; flex-shrink: 100; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folderErr { flex: none; color: var(--red); font-size: var(--text-small); }
+.folderRemove {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: var(--radius-lg); background: none;
+  color: var(--ink-faint); padding: var(--space-1); cursor: pointer;
+}
+.folderRemove:hover { color: var(--red); border-color: var(--line); background: var(--panel); }
+.folderRemove:disabled { opacity: .55; cursor: default; }
 /* The rescan glyph. `currentColor` throughout, so it takes .ghost's hover with
    the border rather than needing its own rule for it. */
 .reload { display: block; width: 1.125rem; height: 1.125rem; color: currentColor; }
