@@ -7,15 +7,86 @@
 
    Only the heading stays outside -- it is the control that unfolds the panel,
    so it has to survive the plot being gone. */
-.minimap {
-  background: var(--panel); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: var(--space-4) var(--space-5) var(--space-5);
+/* ---- the row: margin, panel, margin ----
+   Three tracks. The middle is the panel, held to the same cap the panel has
+   always had; the outer two are whatever the window has left over, split
+   evenly, which is exactly where the panel's auto margins used to put it --
+   except that now they are columns, and the order feed sits in them. The
+   panel's width is what it was, and it is centred the way it was.
+
+   Inside a container, so the break to a stacked layout below measures the row
+   and not the viewport: the row is the page's width less its padding, and it
+   is the row the margins are a share of. The container has to be a separate
+   element -- a query is answered by an ancestor, never by the element it
+   styles -- and `.box` is that and nothing else. */
+.box { container-type: inline-size; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--panel-max)) minmax(0, 1fr);
+  grid-template-areas: "left map right";
+  column-gap: var(--space-5); row-gap: var(--space-4); align-items: start;
+  margin-bottom: var(--space-6);
+  /* How a feed column lays its players out: down the margin, or along the
+     line under the map when stacked. Read by OrderFeed. */
+  --feed-dir: column; --feed-item: none;
 
   /* How wide the plot is allowed to get. The backing store is 2048 wide, so
      at the cap there are still 1.6 canvas pixels to a CSS pixel and the map is
      sampled down rather than magnified -- past this it starts being stretched,
-     and it is no more readable for being the width of a desk. */
+     and it is no more readable for being the width of a desk. Set on the row
+     rather than the panel because the row's middle track reads it; the panel
+     inherits it. */
   --map-max: 1280px;
+  /* The panel: the plot plus its own padding either side plus its two
+     borders, written out rather than added up so it cannot drift from them. */
+  --panel-max: calc(var(--map-max) + var(--space-5) * 2 + 2px);
+  /* The least a margin is worth putting a feed in. Under it the two columns
+     go under the map instead. */
+  --margin-min: 11rem;
+}
+.row > .minimap { grid-area: map; margin: 0; }
+.row > :first-child:not(.minimap) { grid-area: left; }
+.row > :last-child:not(.minimap) { grid-area: right; }
+/* The feed's top lines up with the plot, under the panel's heading row. */
+.row > :not(.minimap) { padding-top: calc(var(--space-4) + 1.75rem + var(--space-3)); }
+/* Half the cap, and nothing else changes: the canvas is a fixed backing store
+   scaled by CSS, so the whole of "compact" is this one number. */
+.rowCompact { --map-max: 640px; }
+/* Stacked: the panel takes the row, and the two feed columns share a second
+   line under it. Always at wide, where the panel is the page by definition;
+   at the other two sizes when the row is too narrow to give each margin
+   `--margin-min` -- the panel's cap plus two margins plus the two gaps. The
+   two queries are one condition at two caps, and the numbers in them are
+   the same terms as the variables above, which a container query cannot
+   read, so they are written out: 640 + 2*20 + 2 = 682 and 1280 + 40 + 2 =
+   1322, plus 2 * 176 for the margins and 2 * 20 for the gaps. */
+.rowWide { grid-template-columns: 1fr 1fr; grid-template-areas: "map map" "left right"; }
+.rowWide > .minimap { max-width: none; }
+@container (max-width: 1073px) {
+  .rowCompact { grid-template-columns: 1fr 1fr; grid-template-areas: "map map" "left right"; }
+}
+@container (max-width: 1713px) {
+  .rowLarge { grid-template-columns: 1fr 1fr; grid-template-areas: "map map" "left right"; }
+}
+/* Stacked, the feed's padding-top would be a gap between the map and the
+   columns under it; the panel's own bottom margin is that gap already. */
+.rowWide { --feed-dir: row; --feed-item: 1 1 11rem; }
+.rowWide > :not(.minimap) { padding-top: 0; }
+@container (max-width: 1073px) {
+  .rowCompact { --feed-dir: row; --feed-item: 1 1 11rem; }
+  .rowCompact > :not(.minimap) { padding-top: 0; }
+}
+@container (max-width: 1713px) {
+  .rowLarge { --feed-dir: row; --feed-item: 1 1 11rem; }
+  .rowLarge > :not(.minimap) { padding-top: 0; }
+}
+/* Folded, there is no feed, and the row is the heading alone. */
+.folded { margin-bottom: 0; }
+
+.minimap {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: var(--space-4) var(--space-5) var(--space-5);
+  min-width: 0;
 
   /* The cap is on the panel, not on the plot inside it. Capping the plot alone
      left the border running the full width of the window with the map sitting
@@ -33,7 +104,7 @@
    cards left above the fold rather than pushed off it. The chips floating over
    the plot are the one thing that does not scale with it, so they step down
    too: at full size they would take a third of a compact map's width. */
-.compact { --map-max: 640px; }
+/* The cap itself now lives on `.row`; see `.rowCompact`. */
 /* No cap at all: the panel takes the page, and the plot with it.
    Deliberately a third setting rather than a larger `--map-max`, because it
    spends two things the cap was protecting. Past 1280px the 2048-wide backing
