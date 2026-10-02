@@ -125,8 +125,8 @@ export function Gutter({ entry, mine }: {
   entry: SavedEntry | null;
   /**
    * Whether the recording is one of your games -- see `useIdentity`. False
-   * marks the row: the owner is somebody else, so the crown, if there is
-   * one, is theirs. Null, or left out, says nothing either way.
+   * marks the row as somebody else's and drops the crown, which would be
+   * theirs. Null, or left out, says nothing either way.
    */
   mine?: boolean | null;
 }) {
@@ -135,7 +135,9 @@ export function Gutter({ entry, mine }: {
       {entry && entry.humans >= 2 ? (
         <span className={styles.mp} title={`${entry.humans} human players`}>MP</span>
       ) : null}
-      {yours(entry) ? (
+      {/* Not on somebody else's recording: the crown would be theirs, and in
+          this margin it reads as yours. The roster's crowns still say who won. */}
+      {mine !== false && yours(entry) ? (
         <span
           className={styles.win}
           title={`${entry!.players[entry!.pov!].name} won -- this is their recording`}
