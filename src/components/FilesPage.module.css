@@ -64,17 +64,41 @@
 .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .seg button + button { border-left: 1px solid var(--line); }
 
-/* The list of folders, at the top of the frame when it is open. Each line is
-   a path, and a path is the one thing here that can be any length, so it is
-   the thing that gives. */
-.folders { border-bottom: 1px solid var(--line); background: var(--panel-2); }
+/* The folders dialog: a native <dialog>, so the browser centres it in the top
+   layer and draws the backdrop. Padding is on the parts, not the box, because
+   a click on the box's own padding would read as a click on the backdrop. */
+.dialog {
+  width: min(40rem, calc(100vw - 2rem)); max-height: calc(100vh - 4rem);
+  padding: 0; border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--panel); color: var(--ink);
+  box-shadow: 0 18px 50px rgb(0 0 0 / .35);
+}
+.dialog[open] { display: flex; flex-direction: column; }
+.dialog::backdrop { background: rgb(0 0 0 / .45); }
+.dialogHead, .dialogFoot {
+  flex: none; display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.dialogHead { border-bottom: 1px solid var(--line); font-size: var(--text-control); }
+.dialogFoot { border-top: 1px solid var(--line); }
+
+/* The list of folders inside it. Each line is a path, and a path is the one
+   thing here that can be any length, so it is the thing that gives. */
+.folders { flex: 1; min-height: 0; overflow-y: auto; background: var(--panel-2); }
 .folder {
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line);
   font-size: var(--text-control); color: var(--ink-dim);
 }
 .folder:last-child { border-bottom: 0; }
-.folderPath { min-width: 0; flex-shrink: 100; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The checkbox and the path are one label, so the whole path is the target. */
+.folderCheck {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2); cursor: pointer;
+}
+.folderCheck input { flex: none; margin: 0; accent-color: var(--accent); }
+.folderPath { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folderCheck:has(input:not(:checked)) .folderPath { color: var(--ink-faint); }
+.folderCount { flex: none; font-size: var(--text-small); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
 .folderErr { flex: none; color: var(--red); font-size: var(--text-small); }
 .folderRemove {
   flex: none; display: flex; align-items: center; justify-content: center;
