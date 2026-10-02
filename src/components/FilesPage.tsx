@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 
-import type { LibraryEntry } from "../electron";
+import type { LibraryEntry, LibraryFolder } from "../electron";
 import type { Candidate, IdentityState } from "../hooks/useIdentity";
 import type { Library } from "../hooks/useLibrary";
 import type { Prescan } from "../hooks/usePrescan";
@@ -392,6 +392,141 @@ function matches(row: Row, terms: string[]): boolean {
   return terms.every((term) => hay.includes(term));
 }
 
+/*
+ * The folders unticked in the folders dialog, by path. Kept across restarts:
+ * a folder you have filtered out is usually one you keep filtered out -- the
+ * downloads you only sometimes want mixed in with your own games.
+ */
+const HIDDEN_KEY = "aoe2:hiddenFolders";
+
+function readHidden(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY);
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(list) ? list.filter((p): p is string => typeof p === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeHidden(hidden: Set<string>) {
+  try {
+    if (hidden.size) localStorage.setItem(HIDDEN_KEY, JSON.stringify([...hidden]));
+    else localStorage.removeItem(HIDDEN_KEY);
+  } catch {
+    /* Storage refused: the filter still holds for this session. */
+  }
+}
+
+/** The folder a row came from: the file's, or the one its parse was found in. */
+const rootOf = (row: Row) => row.entry?.root ?? row.saved?.root;
+
+/*
+ * The folders, as a dialog over the page rather than a band at the top of the
+ * list. It was a band that pushed the list down, and it had no way to close it
+ * except the button that opened it, at the other end of the head.
+ *
+ * A native `<dialog>` opened modally: the backdrop, Escape, and keeping the
+ * focus inside are the platform's, not reimplemented here. A click on the
+ * backdrop closes it too -- the backdrop is the dialog element itself, so a
+ * click whose target is the dialog landed outside its box.
+ *
+ * Each folder has a checkbox for whether the list shows it, and removing one
+ * deletes nothing -- the files stay, and so do their kept parses, which is why
+ * it does not ask first.
+ */
+function FoldersDialog({ folders, counts, hidden, scanning, onToggle, onOnly, onAll, onAdd, onRemove, onClose }: {
+  folders: LibraryFolder[];
+  /** How many rows each folder holds, by path, before the checkboxes. */
+  counts: Map<string, number>;
+  hidden: Set<string>;
+  scanning: boolean;
+  onToggle: (path: string) => void;
+  /** Tick this one and untick the rest. */
+  onOnly: (path: string) => void;
+  onAll: () => void;
+  onAdd: () => void;
+  onRemove: (path: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el && !el.open) el.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={ref}
+      className={styles.dialog}
+      aria-labelledby="folders-title"
+      /* Escape fires `cancel` and then `close`; React state follows `close`,
+         so every way out goes through the one handler. */
+      onClose={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) e.currentTarget.close(); }}
+    >
+      <div className={styles.dialogHead}>
+        <strong id="folders-title">Folders</strong>
+        <span className={ui.spacer} />
+        {hidden.size ? (
+          <button className={styles.link} onClick={onAll}>Show all</button>
+        ) : null}
+        <button
+          className={styles.folderRemove}
+          aria-label="Close"
+          title="Close"
+          onClick={() => ref.current?.close()}
+        >
+          <Glyph d={CROSS} />
+        </button>
+      </div>
+      <div className={styles.folders}>
+        {folders.map((f) => (
+          <div key={f.path} className={styles.folder}>
+            <label className={styles.folderCheck} title={f.path}>
+              <input
+                type="checkbox"
+                checked={!hidden.has(f.path)}
+                onChange={() => onToggle(f.path)}
+              />
+              <span className={styles.folderPath}>{f.path}</span>
+            </label>
+            <span className={styles.folderCount}>{counts.get(f.path) ?? 0}</span>
+            {f.detected ? <span className={styles.chip}>detected</span> : null}
+            {f.error ? <span className={styles.folderErr}>{f.error}</span> : null}
+            {folders.length > 1 ? (
+              <button
+                className={styles.link}
+                title="List this folder and none of the others"
+                onClick={() => onOnly(f.path)}
+              >
+                only
+              </button>
+            ) : null}
+            <button
+              className={styles.folderRemove}
+              aria-label={`Stop listing ${f.path}`}
+              title="Take this folder off the list. Nothing in it is deleted."
+              disabled={scanning}
+              onClick={() => onRemove(f.path)}
+            >
+              <Glyph d={BIN} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className={styles.dialogFoot}>
+        <button className={ui.ghost} onClick={onAdd} disabled={scanning}>
+          <Glyph d={FOLDER} />
+          Add folder...
+        </button>
+        <span className={ui.spacer} />
+        <button className={ui.ghost} onClick={() => ref.current?.close()}>Close</button>
+      </div>
+    </dialog>
+  );
+}
+
 /** All of the list, only your games, or only everyone else's. */
 type Whose = "all" | "mine" | "others";
 
@@ -423,9 +558,15 @@ export function FilesPage({
 }: Props) {
   const [query, setQuery] = useState("");
   const [whose, setWhose] = useState<Whose>("all");
-  /* The folder list, under the head when it is open. Closed by default: the
-     folders change once, the list is looked at every day. */
+  /* The folders dialog. Closed by default: the folders change once, the list
+     is looked at every day. */
   const [foldersShown, setFoldersShown] = useState(false);
+  /* Folders whose rows the list leaves out -- the dialog's checkboxes. */
+  const [hidden, setHidden] = useState<Set<string>>(readHidden);
+  const changeHidden = useCallback((next: Set<string>) => {
+    setHidden(next);
+    writeHidden(next);
+  }, []);
   /* Off by default, and per session: hiding them is the point, but a list that
      cannot be talked into showing what it is holding back is a list you have
      to leave to check something. */
@@ -489,10 +630,30 @@ export function FilesPage({
     [all, prescan.failed],
   );
   const unreadable = all.length - rows.length;
-  const scenarios = useMemo(() => rows.filter(isScenario).length, [rows]);
+  /* Per folder, for the dialog: how much each checkbox puts back or takes out. */
+  const folderCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      const root = rootOf(row);
+      if (root !== undefined) counts.set(root, (counts.get(root) ?? 0) + 1);
+    }
+    return counts;
+  }, [rows]);
+  /* Only paths that are still folders count: one removed while unticked would
+     otherwise hide its leftover kept parses with no checkbox to bring them back. */
+  const hiding = useMemo(
+    () => new Set(folders.map((f) => f.path).filter((p) => hidden.has(p))),
+    [folders, hidden],
+  );
+  /* A row from no folder -- a drop, a loaded file -- has no checkbox, so it stays. */
+  const ticked = useMemo(
+    () => (hiding.size ? rows.filter((row) => !hiding.has(rootOf(row) ?? "")) : rows),
+    [rows, hiding],
+  );
+  const scenarios = useMemo(() => ticked.filter(isScenario).length, [ticked]);
   const listed = useMemo(
-    () => (scenariosShown || !scenarios ? rows : rows.filter((row) => !isScenario(row))),
-    [rows, scenarios, scenariosShown],
+    () => (scenariosShown || !scenarios ? ticked : ticked.filter((row) => !isScenario(row))),
+    [ticked, scenarios, scenariosShown],
   );
   /* "Others" is the rows the list can say are somebody else's; a row with no
      parse yet, or no owner named, is neither and only shows under "All". */
@@ -532,8 +693,9 @@ export function FilesPage({
      footnote under a list -- and it is the drop zone that reports the parse.
      Not while the scan is going: a folder whose newest files cannot be read
      starts out empty, and the zone would appear only to be replaced by a list
-     a moment later. */
-  const bare = !listed.length && !scanning && !prescan.active;
+     a moment later. Nor with folders unticked: that list is empty on request,
+     and the way back is the folders dialog, not a drop. */
+  const bare = !listed.length && !hiding.size && !scanning && !prescan.active;
 
   return (
     <section className={styles.library} aria-label="Recordings">
@@ -546,12 +708,17 @@ export function FilesPage({
           <button
             className={styles.path}
             title={folders.map((f) => f.path).join("\n")}
+            aria-haspopup="dialog"
             aria-expanded={foldersShown}
-            onClick={() => setFoldersShown((was) => !was)}
+            onClick={() => setFoldersShown(true)}
           >
             <Glyph d={FOLDER} />
             <span className={styles.pathText}>
-              {folders.length === 1 ? folders[0]!.path : `${folders.length} folders`}
+              {folders.length === 1
+                ? folders[0]!.path
+                : hiding.size
+                  ? `${folders.length - hiding.size} of ${folders.length} folders`
+                  : `${folders.length} folders`}
             </span>
           </button>
         ) : null}
@@ -660,36 +827,24 @@ export function FilesPage({
           and a solid one a pixel outside it read as a mistake. */}
       <div className={bare ? styles.bare : styles.frame}>
 
-      {/* The folders the list is read from. One line each, with the way to
-          take it off and, at the bottom, the way to add one. Removing deletes
-          nothing -- the files stay, and so do their kept parses, which is why
-          it does not ask first. */}
       {foldersShown && folders.length ? (
-        <div className={styles.folders}>
-          {folders.map((f) => (
-            <div key={f.path} className={styles.folder}>
-              <span className={styles.folderPath} title={f.path}>{f.path}</span>
-              {f.detected ? <span className={styles.chip}>detected</span> : null}
-              {f.error ? <span className={styles.folderErr}>{f.error}</span> : null}
-              <span className={ui.spacer} />
-              <button
-                className={styles.folderRemove}
-                aria-label={`Stop listing ${f.path}`}
-                title="Take this folder off the list. Nothing in it is deleted."
-                disabled={scanning}
-                onClick={() => void library.remove(f.path)}
-              >
-                <Glyph d={CROSS} />
-              </button>
-            </div>
-          ))}
-          <div className={styles.folder}>
-            <button className={ui.ghost} onClick={() => void library.add()} disabled={scanning}>
-              <Glyph d={FOLDER} />
-              Add folder...
-            </button>
-          </div>
-        </div>
+        <FoldersDialog
+          folders={folders}
+          counts={folderCounts}
+          hidden={hiding}
+          scanning={scanning}
+          onToggle={(path) => {
+            const next = new Set(hiding);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            changeHidden(next);
+          }}
+          onOnly={(path) => changeHidden(new Set(folders.map((f) => f.path).filter((p) => p !== path)))}
+          onAll={() => changeHidden(new Set())}
+          onAdd={() => void library.add()}
+          onRemove={(path) => void library.remove(path)}
+          onClose={() => setFoldersShown(false)}
+        />
       ) : null}
 
       {/* What the background scan is doing, and the way out of it. It is CPU
@@ -705,11 +860,11 @@ export function FilesPage({
 
       {notice ? <div className={`${styles.empty} ${styles.err}`}>{notice}</div> : null}
       {saved.error ? <div className={`${styles.empty} ${styles.err}`}>{saved.error}</div> : null}
-      {/* A folder that cannot be read, said here while the list of them is
-          closed; open, the folder's own line carries it. */}
-      {!foldersShown ? folders.filter((f) => f.error).map((f) => (
+      {/* A folder that cannot be read. The dialog's line for it says so too,
+          but the dialog is closed most of the time. */}
+      {folders.filter((f) => f.error).map((f) => (
         <div key={f.path} className={`${styles.empty} ${styles.err}`}>{f.path}: {f.error}</div>
-      )) : null}
+      ))}
 
       {/* How the last attempt to open something went. It belongs here, with the
           button that starts one: a file can be dropped on a match, and the
@@ -869,7 +1024,13 @@ export function FilesPage({
       ) : null}
 
       {rows.length && !found.length ? (
-        <div className={styles.empty}>No recording matches “{query}”.</div>
+        <div className={styles.empty}>
+          {query
+            ? <>No recording matches “{query}”.</>
+            : hiding.size
+              ? <>Nothing in the ticked folders. <button className={styles.link} onClick={() => setFoldersShown(true)}>Choose folders</button></>
+              : "Nothing to list."}
+        </div>
       ) : null}
 
       {found.length > shown.length ? (
