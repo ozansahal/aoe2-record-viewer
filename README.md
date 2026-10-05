@@ -455,7 +455,12 @@ Hard-won details in the parser that look like cleanups but are not:
   In the scenario block: the two 64-byte blocks mgz reads after the scenario
   filename come before it, the six message ids come after it, `aocString` reads
   its length unsigned, and the settings-version marker the trigger search looks
-  for is 4.7 at save 67.2 and 4.9 at save 68 (mgz's table stops at 4.5). The
+  for is 4.7 at save 67.2, 4.9 at save 68 and 5.0 at save 68.9 (mgz's table
+  stops at 4.5); past the table's value the search tries the next ten steps of
+  0.1, and finding none is an error rather than a seek to +7. A built-in map or
+  a civilization newer than the bundled reference data is named from the
+  recording (the map's script name, `Civilization <id>`) instead of failing
+  the parse; mgz throws on both. The
   triggers themselves are walked in `deTrigger` rather than in mgz's much older
   shape, and what follows them is 1028 bytes plus the scenario's variables
   rather than a flat 1032. Elsewhere: AI-issued RESEARCH omits the trailing
@@ -508,7 +513,7 @@ sit on `match.players[].achievements` for whatever reads them next.
 
 - The difficulty label is read from the English instructions block only; other
   languages fall back to mgz's (wrong) header value.
-- DE save 67.2 and save 68 are verified. Older DE, HD and UserPatch branches
+- DE save 67.2, 68 and 68.9 are verified. Older DE, HD and UserPatch branches
   are ported as written but untested.
 - Dataset 101 (the AoE1-in-DE mod) is bundled but has not been exercised.
 - Single-player recordings used to fail — 93 of the 131 in the development
