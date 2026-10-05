@@ -875,7 +875,8 @@ function parseScenario(data: Rec, _numPlayers: number, version: Rec, save: Rec) 
        game type, chat, seed -- was being read out of the middle of the
        scenario. Both values are measured, from every recording in the
        development folder; where 4.7 begins below 67.2 is not known. */
-    if (save >= 68) settingsVersion = 4.9;
+    if (save >= 68.9) settingsVersion = 5.0;
+    else if (save >= 68) settingsVersion = 4.9;
     else if (save >= 67.2) settingsVersion = 4.7;
     else if (save >= 66.3) settingsVersion = 4.5;
     else if (save >= 64.3) settingsVersion = 4.1;
@@ -888,9 +889,25 @@ function parseScenario(data: Rec, _numPlayers: number, version: Rec, save: Rec) 
     else if (save >= 25.06) settingsVersion = 2.5;
     else if (save >= 13.34) settingsVersion = 2.4;
     else settingsVersion = 2.2;
+    /* Patch 54800 (save 68.9) moved it once more, to 5.0 -- measured on all 23
+       of its recordings -- and every recording it wrote was being read from
+       those seven bytes in until it was in the table. The random-map games
+       got away with it, as above; one with anything in its scenario did
+       not, and was not read at all. So the table's value is only the first guess: past it,
+       the next ten steps of 0.1 are tried in order, and the first one found
+       wins. The game has only ever moved the marker forward, a step or two at
+       a time, so the next patch to do it is read rather than misread. Not
+       finding any of them is an error, not a seek to +7: a recording read
+       from the wrong offset looks like a good parse and is not one. */
     const needle = new Uint8Array(8);
-    new DataView(needle.buffer).setFloat64(0, settingsVersion, true);
-    end = findFrom(needle) + 8;
+    const view = new DataView(needle.buffer);
+    let at = -1;
+    for (let step = 0; step <= 10 && at === -1; step++) {
+      view.setFloat64(0, Math.round((settingsVersion + step / 10) * 10) / 10, true);
+      at = findFrom(needle);
+    }
+    if (at === -1) throw new Error(`no settings-version marker from ${settingsVersion} up (save ${save})`);
+    end = at + 8;
   } else {
     end = findFrom(bytesFromHex("9a9999999999f93f")) + 13;
   }
@@ -2590,6 +2607,12 @@ function lookupName(mapId: Rec, name: Rec, version: Rec, reference: Rec) {
       name = reference.maps[String(mapId)];
     } else if (version === Version.AOK) {
       return [name, false];
+    } else if (isDe && name) {
+      /* A map newer than the reference data -- every patch that adds one
+         (216, Arabian Desert, in 54800) used to make each recording on it
+         unreadable. The instructions block names the map's script, which
+         is the map's name, so that is the answer until the table catches up. */
+      return [name, false];
     } else {
       throw new Error(
         `unspecified builtin map: ${mapId} aka ${name} (${reference.dataset.name})`);
@@ -3016,7 +3039,10 @@ function parseMatch(input: RecordingInput, options: ParseOptions = {}): Match {
       name: decodeBytes(merged.name, encoding),
       color: consts.player_colors[String(merged.color_id)],
       color_id: merged.color_id,
-      civilization: dataset.civilizations[String(merged.civilization_id)].name,
+      /* A civ newer than the reference data used to throw here, and the
+         whole recording with it. The id is still right; only the name waits. */
+      civilization: dataset.civilizations[String(merged.civilization_id)]?.name
+        ?? `Civilization ${merged.civilization_id}`,
       civilization_id: merged.civilization_id,
       position: { x: posX, y: posY },
       objects: merged.objects.map(makeObject),
