@@ -44,7 +44,11 @@
      go under the map instead. */
   --margin-min: 11rem;
 }
-.row > .minimap { grid-area: map; margin: 0; }
+/* Centred by the track, not by margins. Stacked, the panel spans both columns
+   and its cap leaves room either side; `margin: 0` here had also taken away
+   the auto margins that centred it, so it sat against the left edge. Full width
+   up to the cap, then centred in whatever is left. */
+.row > .minimap { grid-area: map; margin: 0; width: 100%; justify-self: center; }
 .row > :first-child:not(.minimap) { grid-area: left; }
 .row > :last-child:not(.minimap) { grid-area: right; }
 /* The feed's top lines up with the plot, under the panel's heading row. */
