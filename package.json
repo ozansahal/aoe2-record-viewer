@@ -22,8 +22,6 @@
     "test": "node --test \"test/**/*.test.ts\"",
     "start": "npm run build && electron .",
     "package": "npm run build && electron-builder",
-    "parse": "node cli/parse_rec.js",
-    "events": "node cli/filter_events.js",
     "package:portable": "npm run build && electron-builder --win portable"
   },
   "dependencies": {
